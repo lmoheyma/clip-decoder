@@ -18,8 +18,8 @@ class Confidence(str, Enum):
 
 
 class Caption(BaseModel):
-    start_s: float
-    end_s: float
+    start_s: Annotated[float, Field(ge=0.0)]
+    end_s: Annotated[float, Field(ge=0.0)]
     text: str
 
 
@@ -28,7 +28,7 @@ class IngestResult(BaseModel):
     video_path: Path
     title: str
     channel: str
-    duration_s: float
+    duration_s: Annotated[float, Field(ge=0.0)]
     captions: list[Caption] = []
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -36,14 +36,14 @@ class IngestResult(BaseModel):
 
 class KeyFrame(BaseModel):
     shot_id: str
-    timestamp_s: float
+    timestamp_s: Annotated[float, Field(ge=0.0)]
     frame_path: Path
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class FrameAnalysis(BaseModel):
-    timestamp_s: float
+    timestamp_s: Annotated[float, Field(ge=0.0)]
     frame_id: str
     composition: str
     palette: list[str]
@@ -55,7 +55,7 @@ class FrameAnalysis(BaseModel):
 
 
 class ReferenceCandidate(BaseModel):
-    timestamp_s: float
+    timestamp_s: Annotated[float, Field(ge=0.0)]
     source_frame_id: str
     work_title: Annotated[str, Field(min_length=1)]
     work_creator: Annotated[str, Field(min_length=1)]
@@ -76,7 +76,7 @@ class Report(BaseModel):
     youtube_id: str
     title: str
     channel: str
-    duration_s: float
+    duration_s: Annotated[float, Field(ge=0.0)]
     references: list[VerifiedReference]
     frame_analyses: list[FrameAnalysis]
 
