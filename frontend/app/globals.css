@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "The Future";
+  src: local("The Future"), local("Arial");
+  font-display: swap;
+}
+@font-face {
+  font-family: "PP Neue Montreal Mono";
+  src: local("PP Neue Montreal Mono"), local("Georgia");
+  font-display: swap;
+}
+
+:root {
+  --color-midnight: #010120;
+  --shadow-midnight: 0px 4px 10px rgba(1, 1, 32, 0.1);
+}
+
+html, body {
+  font-family: "The Future", Arial, sans-serif;
+  letter-spacing: -0.16px;
+  background: #ffffff;
+  color: #000000;
+}
+
+.bg-pastel-cloud {
+  background:
+    radial-gradient(60% 50% at 20% 30%, #ffd5f0 0%, transparent 60%),
+    radial-gradient(50% 50% at 80% 20%, #c9d8ff 0%, transparent 60%),
+    radial-gradient(70% 60% at 50% 80%, #e8e0ff 0%, transparent 70%),
+    #ffffff;
+}
+
+.surface-dark { background: var(--color-midnight); color: #ffffff; }
+.shadow-midnight { box-shadow: var(--shadow-midnight); }
+.tracking-display { letter-spacing: -1.92px; }
+.tracking-h2 { letter-spacing: -0.8px; }
+.tracking-mono-label { letter-spacing: 0.055px; }
