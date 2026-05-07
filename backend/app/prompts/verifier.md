@@ -19,10 +19,10 @@ You are an adversarial reviewer. A previous model has proposed a reference. Your
 Strict JSON. No markdown.
 
 ```
-{
+{{
   "verdict": "keep" | "speculative" | "reject",
   "supporting_elements": ["<concrete element>", "<concrete element>", "<concrete element>"],
   "final_confidence": <float 0..1>,
   "rationale": "<one sentence>"
-}
+}}
 ```

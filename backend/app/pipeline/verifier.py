@@ -1,0 +1,103 @@
+from __future__ import annotations
+import asyncio
+import urllib.parse
+import httpx
+from app.models import (
+    Confidence,
+    FrameAnalysis,
+    ReferenceCandidate,
+    Verdict,
+    VerifiedReference,
+)
+from app.nim.client import NimClient
+from app.prompts.loader import load_prompt
+
+
+WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{slug}"
+
+
+class Verifier:
+    def __init__(
+        self,
+        nim_client: NimClient,
+        model: str,
+        wikipedia: bool = True,
+        concurrency: int = 4,
+    ):
+        self._nim = nim_client
+        self._model = model
+        self._wiki = wikipedia
+        self._sem = asyncio.Semaphore(concurrency)
+        self._template = load_prompt("verifier")
+
+    async def _wiki_url(self, work_title: str) -> str | None:
+        slug = urllib.parse.quote(work_title.replace(" ", "_"))
+        async with httpx.AsyncClient(timeout=10.0) as http:
+            try:
+                r = await http.get(WIKI_SUMMARY_URL.format(slug=slug))
+            except httpx.HTTPError:
+                return None
+            if r.status_code != 200:
+                return None
+            data = r.json()
+            try:
+                return data["content_urls"]["desktop"]["page"]
+            except (KeyError, TypeError):
+                return None
+
+    def _bucket(self, verdict: Verdict, wiki_url: str | None) -> Confidence:
+        if verdict is Verdict.REJECT:
+            return Confidence.HIDDEN
+        if verdict is Verdict.SPECULATIVE:
+            return Confidence.SPECULATIVE
+        # verdict == KEEP
+        if self._wiki and wiki_url is None:
+            return Confidence.SPECULATIVE
+        return Confidence.CONFIRMED
+
+    async def _verify_one(
+        self,
+        candidate: ReferenceCandidate,
+        frame_index: dict[str, FrameAnalysis],
+    ) -> VerifiedReference:
+        async with self._sem:
+            fa = frame_index.get(candidate.source_frame_id)
+            fa_blob = fa.model_dump_json() if fa else "{}"
+            cand_blob = candidate.model_dump_json()
+            prompt = self._template.format(
+                candidate=cand_blob, frame_analysis=fa_blob
+            )
+            data = await self._nim.complete_text(
+                model=self._model,
+                messages=[{"role": "user", "content": prompt}],
+                json_mode=True,
+            )
+        verdict = Verdict(str(data.get("verdict", "reject")).lower())
+        supporting = [str(x) for x in (data.get("supporting_elements") or [])]
+        wiki_url: str | None = None
+        if self._wiki and verdict is not Verdict.REJECT:
+            wiki_url = await self._wiki_url(candidate.work_title)
+        bucket = self._bucket(verdict, wiki_url)
+        return VerifiedReference(
+            **candidate.model_dump(),
+            verdict=verdict,
+            final_confidence=bucket,
+            supporting_elements=supporting,
+            wikipedia_url=wiki_url,
+        )
+
+    async def verify(
+        self,
+        candidate: ReferenceCandidate,
+        frame_index: dict[str, FrameAnalysis],
+    ) -> VerifiedReference:
+        return await self._verify_one(candidate, frame_index)
+
+    async def verify_all(
+        self,
+        candidates: list[ReferenceCandidate],
+        frame_index: dict[str, FrameAnalysis],
+    ) -> list[VerifiedReference]:
+        return await asyncio.gather(
+            *(self._verify_one(c, frame_index) for c in candidates)
+        )
