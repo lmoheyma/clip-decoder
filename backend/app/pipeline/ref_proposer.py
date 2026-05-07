@@ -1,10 +1,17 @@
 from __future__ import annotations
-import json
+import logging
 from typing import Iterable
 from pydantic import ValidationError
 from app.models import FrameAnalysis, ReferenceCandidate
 from app.nim.client import NimClient
 from app.prompts.loader import load_prompt
+
+logger = logging.getLogger(__name__)
+
+
+def _escape_braces(s: str) -> str:
+    """Escape literal braces so the string survives a `.format()` substitution."""
+    return s.replace("{", "{{").replace("}", "}}")
 
 
 def _format_frame_summaries(frames: Iterable[FrameAnalysis]) -> str:
@@ -19,7 +26,7 @@ def _format_frame_summaries(frames: Iterable[FrameAnalysis]) -> str:
             f"features={', '.join(f.distinctive_features)}; "
             f"raw={f.raw_description}"
         )
-    return "\n".join(blocks)
+    return _escape_braces("\n".join(blocks))
 
 
 class RefProposer:
@@ -37,9 +44,9 @@ class RefProposer:
         frame_analyses: list[FrameAnalysis],
     ) -> list[ReferenceCandidate]:
         prompt = self._template.format(
-            title=title or "(unknown)",
-            channel=channel or "(unknown)",
-            lyrics=lyrics_text or "(none)",
+            title=_escape_braces(title or "(unknown)"),
+            channel=_escape_braces(channel or "(unknown)"),
+            lyrics=_escape_braces(lyrics_text or "(none)"),
             frame_summaries=_format_frame_summaries(frame_analyses),
         )
         data = await self._nim.complete_text(
@@ -52,7 +59,7 @@ class RefProposer:
         for item in raw:
             try:
                 out.append(ReferenceCandidate.model_validate(item))
-            except ValidationError:
-                # Drop silently — vague/incomplete claims are filtered by design.
+            except ValidationError as e:
+                logger.debug("dropped invalid candidate %r: %s", item, e)
                 continue
         return out
