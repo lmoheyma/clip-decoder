@@ -5,7 +5,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 from sqlalchemy import String, Float, Integer, DateTime, JSON, ForeignKey, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.models import Report
@@ -33,10 +33,10 @@ class AnalysisRow(Base):
     report_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
@@ -52,7 +52,7 @@ class FlagRow(Base):
     ref_index: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -110,6 +110,12 @@ class Database:
             await s.commit()
 
     async def load_report(self, youtube_id: str) -> Report | None:
+        """Return the cached Report or None if not yet completed.
+
+        Returns None for both 'no row exists' and 'row exists but
+        analysis is still RUNNING/PENDING/ERROR'. Callers that need
+        to distinguish these cases must call get_status first.
+        """
         async with self._session() as s:
             row = await s.get(AnalysisRow, youtube_id)
             if row is None or row.report_json is None:
