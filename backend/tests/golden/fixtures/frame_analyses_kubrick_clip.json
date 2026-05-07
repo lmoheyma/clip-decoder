@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp_s": 12.5, "frame_id": "shot_03",
+    "composition": "centered symmetrical hotel corridor, one-point perspective",
+    "palette": ["red", "black", "white"],
+    "camera_move": "slow tracking forward",
+    "costume_setting": "child on tricycle in long carpeted hallway",
+    "distinctive_features": ["one-point perspective", "deep symmetry", "patterned carpet"],
+    "raw_description": "A child rides slowly down a long, perfectly symmetrical hotel corridor lit in deep red.",
+    "confidence_in_observation": 0.92
+  },
+  {
+    "timestamp_s": 38.0, "frame_id": "shot_07",
+    "composition": "wide static frame of two figures standing apart in fog",
+    "palette": ["gray", "blue"],
+    "camera_move": "static",
+    "costume_setting": "figures in long coats on stone bridge",
+    "distinctive_features": ["heavy fog", "tonal contrast"],
+    "raw_description": "Two distant figures separated by fog on a Venetian bridge.",
+    "confidence_in_observation": 0.8
+  }
+]

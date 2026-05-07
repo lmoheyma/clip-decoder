@@ -1,0 +1,19 @@
+{
+  "candidates": [
+    {
+      "timestamp_s": 12.5, "source_frame_id": "shot_03",
+      "work_title": "The Shining", "work_creator": "Stanley Kubrick",
+      "work_year": 1980, "work_type": "film",
+      "reasoning": "symmetrical hotel corridor + slow tracking shot + child on tricycle",
+      "raw_confidence": 0.88
+    },
+    {
+      "timestamp_s": 38.0, "source_frame_id": "shot_07",
+      "work_title": "70s European cinema",
+      "work_creator": "various",
+      "work_type": "film",
+      "reasoning": "fog and tonal contrast",
+      "raw_confidence": 0.4
+    }
+  ]
+}
