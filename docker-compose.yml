@@ -13,10 +13,10 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8000
     ports:
       - "3000:3000"
-    environment:
-      - BACKEND_URL=http://backend:8000
     depends_on:
       - backend
     restart: unless-stopped
