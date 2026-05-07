@@ -21,9 +21,9 @@ Frame summaries:
 Strict JSON. No markdown. No prose outside JSON.
 
 ```
-{
+{{
   "candidates": [
-    {
+    {{
       "timestamp_s": <float>,
       "source_frame_id": "<shot_NN>",
       "work_title": "<exact title>",
@@ -32,7 +32,7 @@ Strict JSON. No markdown. No prose outside JSON.
       "work_type": "<film | painting | photograph | music_video | other>",
       "reasoning": "<one sentence connecting at least three concrete visual elements>",
       "raw_confidence": <float 0..1>
-    }
+    }}
   ]
-}
+}}
 ```
