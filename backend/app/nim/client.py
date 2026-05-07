@@ -29,8 +29,9 @@ class NimClient:
         timeout_s: float = 60.0,
         max_json_retries: int = 1,
     ):
-        if not api_key:
-            raise ValueError("NIM api_key is required")
+        # Validation is deferred to the first request so that the module
+        # remains importable even when NVAPI_KEY is not set (e.g. in tests
+        # that wire build_app directly without a real NIM key).
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout_s = timeout_s
@@ -46,6 +47,8 @@ class NimClient:
     async def _post_chat(
         self, *, model: str, messages: list[dict[str, Any]], json_mode: bool
     ) -> str:
+        if not self._api_key:
+            raise ValueError("NIM api_key is required")
         body: dict[str, Any] = {
             "model": model,
             "messages": messages,
