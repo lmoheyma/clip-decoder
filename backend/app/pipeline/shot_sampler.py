@@ -28,10 +28,10 @@ class ShotSampler:
         all_shots = [(s.get_seconds(), e.get_seconds()) for s, e in scene_list]
         if len(all_shots) <= self._max_shots:
             return all_shots
-        # Evenly distribute selection across the timeline
+        # Evenly distribute selection across the timeline, including the tail.
         n = len(all_shots)
-        step = n / self._max_shots
-        return [all_shots[int(i * step)] for i in range(self._max_shots)]
+        step = (n - 1) / (self._max_shots - 1)
+        return [all_shots[round(i * step)] for i in range(self._max_shots)]
 
     def sample(self, video_path: Path, *, youtube_id: str) -> list[KeyFrame]:
         scene_list = detect(str(video_path), ContentDetector(threshold=27.0))
