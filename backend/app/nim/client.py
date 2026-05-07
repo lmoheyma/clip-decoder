@@ -63,7 +63,12 @@ class NimClient:
                 headers=self._headers(),
                 json=body,
             )
-            r.raise_for_status()
+            if r.status_code >= 400:
+                logger.error(
+                    "NIM %s for model=%r: %s",
+                    r.status_code, model, r.text[:500],
+                )
+                r.raise_for_status()
             data = r.json()
         try:
             return data["choices"][0]["message"]["content"]
