@@ -30,14 +30,16 @@ class Ingestor:
 
     def _ydl_opts(self, youtube_id: str) -> dict[str, Any]:
         out_template = str(self._work_dir / f"{youtube_id}.%(ext)s")
+        # Captions are unused in v1 (_captions_from_info returns []);
+        # requesting them via writeautomaticsub triggers YouTube
+        # rate limiting (429) and crashes the whole ingest.
         return {
             "format": "best[height<=480][ext=mp4]/best[height<=480]/best[ext=mp4]/best",
             "outtmpl": out_template,
             "quiet": True,
             "no_warnings": True,
-            "writeautomaticsub": True,
-            "subtitleslangs": ["en", "en-US"],
-            "subtitlesformat": "json3",
+            "writesubtitles": False,
+            "writeautomaticsub": False,
             "skip_download": False,
             "noplaylist": True,
         }
