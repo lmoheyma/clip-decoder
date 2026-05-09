@@ -14,6 +14,9 @@ from app.prompts.loader import load_prompt
 
 
 WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{slug}"
+WIKI_USER_AGENT = (
+    "clip-decoder/0.1 (+https://github.com/lmoheyma/clip-decoder)"
+)
 
 
 class Verifier:
@@ -32,7 +35,10 @@ class Verifier:
 
     async def _wiki_url(self, work_title: str) -> str | None:
         slug = urllib.parse.quote(work_title.replace(" ", "_"))
-        async with httpx.AsyncClient(timeout=10.0) as http:
+        async with httpx.AsyncClient(
+            timeout=10.0,
+            headers={"User-Agent": WIKI_USER_AGENT},
+        ) as http:
             try:
                 r = await http.get(WIKI_SUMMARY_URL.format(slug=slug))
             except httpx.HTTPError:
