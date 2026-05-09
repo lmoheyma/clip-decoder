@@ -33,7 +33,8 @@ class RefProposer:
     def __init__(self, nim_client: NimClient, model: str):
         self._nim = nim_client
         self._model = model
-        self._template = load_prompt("ref_proposer")
+        self._tpl_general = load_prompt("ref_proposer")
+        self._tpl_complement = load_prompt("ref_proposer_complement")
 
     async def _call(self, template: str, ctx: dict) -> list[ReferenceCandidate]:
         prompt = template.format(**ctx)
@@ -66,4 +67,4 @@ class RefProposer:
             "lyrics": _escape_braces(lyrics_text or "(none)"),
             "frame_summaries": _format_frame_summaries(frame_analyses),
         }
-        return await self._call(self._template, ctx)
+        return await self._call(self._tpl_general, ctx)
