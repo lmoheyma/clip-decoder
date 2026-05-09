@@ -13,7 +13,7 @@ Frame summaries:
 
 # Rules
 
-1. **Avoid types in `types_already_proposed`.** Focus on uncovered types from this list: painting, photograph, music_video, film, album_cover, fashion_editorial, ad_campaign, archival_footage, other. If `types_covered` is `(none)`, all types are open.
+1. **Avoid types in `types_covered`.** Focus on uncovered types from this list: painting, photograph, music_video, film, album_cover, fashion_editorial, ad_campaign, archival_footage, other. If `types_covered` is `(none)`, all types are open.
 2. Each reference MUST name a specific work with title and creator. Vague claims ("70s horror cinema", "European art film", "minimalist photography") are forbidden — return nothing rather than something vague.
 3. Each reference MUST cite at least three concrete visual elements from the frame summaries that support it.
 4. Distinguish *visual* references (composition, palette, framing, costume, lighting) from generic mood. Do not propose a reference based purely on theme or lyric.
