@@ -203,3 +203,34 @@ async def test_pass2_failure_returns_pass1_only(caplog):
     assert len(out) == 1
     assert out[0].work_title == "Solaris"
     assert any("pass 2 failed" in rec.message for rec in caplog.records)
+
+
+async def test_pass1_empty_pass2_still_runs_permissive():
+    nim = AsyncMock()
+    nim.complete_text.side_effect = [
+        {"candidates": []},
+        {
+            "candidates": [
+                {
+                    "timestamp_s": 5.0,
+                    "source_frame_id": "shot_02",
+                    "work_title": "Trans-fixed",
+                    "work_creator": "Chris Burden",
+                    "work_year": 1974,
+                    "work_type": "other",
+                    "reasoning": "outstretched figure + cruciform pose + harsh ground",
+                    "raw_confidence": 0.55,
+                }
+            ]
+        },
+    ]
+    rp = RefProposer(nim_client=nim, model="m")
+    out = await rp.propose(
+        title="x", channel="y", lyrics_text="",
+        frame_analyses=[_fa("shot_02", 5.0)],
+    )
+    assert nim.complete_text.await_count == 2
+    pass2_prompt = nim.complete_text.await_args_list[1].kwargs["messages"][0]["content"]
+    assert "Types already proposed by the previous pass: (none)" in pass2_prompt
+    assert len(out) == 1
+    assert out[0].work_title == "Trans-fixed"
