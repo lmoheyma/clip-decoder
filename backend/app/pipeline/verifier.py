@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import logging
 import urllib.parse
 import httpx
 from app.models import (
@@ -11,6 +12,8 @@ from app.models import (
 )
 from app.nim.client import NimClient
 from app.prompts.loader import load_prompt
+
+logger = logging.getLogger(__name__)
 
 
 WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{slug}"
@@ -104,6 +107,20 @@ class Verifier:
         candidates: list[ReferenceCandidate],
         frame_index: dict[str, FrameAnalysis],
     ) -> list[VerifiedReference]:
-        return await asyncio.gather(
-            *(self._verify_one(c, frame_index) for c in candidates)
+        # return_exceptions=True so a single transient failure (e.g. NIM
+        # 5xx that exhausted its retries) doesn't drop every successfully
+        # verified reference. Failed verifications are logged and skipped.
+        results = await asyncio.gather(
+            *(self._verify_one(c, frame_index) for c in candidates),
+            return_exceptions=True,
         )
+        verified: list[VerifiedReference] = []
+        for cand, res in zip(candidates, results):
+            if isinstance(res, BaseException):
+                logger.warning(
+                    "verifier failed for candidate %r: %s",
+                    cand.work_title, res,
+                )
+                continue
+            verified.append(res)
+        return verified

@@ -1,7 +1,9 @@
 from __future__ import annotations
+import asyncio
 import base64
 import json
 import logging
+import random
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,13 @@ class NimClient:
     multimodal flows, and we need precise control over JSON-only
     parsing with retry. httpx async + a few helpers is simpler.
     """
+
+    # NIM occasionally returns 5xx (especially 502) during load spikes.
+    # We retry transient failures with exponential backoff + jitter so a
+    # blip mid-pipeline doesn't fail the whole run.
+    _RETRY_STATUS = {429, 500, 502, 503, 504}
+    _MAX_TRANSIENT_RETRIES = 3
+    _BACKOFF_BASE_S = 0.5
 
     def __init__(
         self,
@@ -58,22 +67,51 @@ class NimClient:
         if json_mode:
             body["response_format"] = {"type": "json_object"}
         async with httpx.AsyncClient(timeout=self._timeout_s) as http:
-            r = await http.post(
-                f"{self._base_url}/chat/completions",
-                headers=self._headers(),
-                json=body,
-            )
-            if r.status_code >= 400:
-                logger.error(
-                    "NIM %s for model=%r: %s",
-                    r.status_code, model, r.text[:500],
-                )
-                r.raise_for_status()
-            data = r.json()
+            for attempt in range(self._MAX_TRANSIENT_RETRIES + 1):
+                try:
+                    r = await http.post(
+                        f"{self._base_url}/chat/completions",
+                        headers=self._headers(),
+                        json=body,
+                    )
+                except (httpx.ReadTimeout, httpx.ConnectError, httpx.RemoteProtocolError) as e:
+                    if attempt >= self._MAX_TRANSIENT_RETRIES:
+                        raise
+                    delay = self._backoff_delay(attempt)
+                    logger.warning(
+                        "NIM transport error (%s) for model=%r; retry %d/%d in %.1fs",
+                        type(e).__name__, model, attempt + 1,
+                        self._MAX_TRANSIENT_RETRIES, delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                if r.status_code in self._RETRY_STATUS and attempt < self._MAX_TRANSIENT_RETRIES:
+                    delay = self._backoff_delay(attempt)
+                    logger.warning(
+                        "NIM %s for model=%r; retry %d/%d in %.1fs",
+                        r.status_code, model, attempt + 1,
+                        self._MAX_TRANSIENT_RETRIES, delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                if r.status_code >= 400:
+                    logger.error(
+                        "NIM %s for model=%r: %s",
+                        r.status_code, model, r.text[:500],
+                    )
+                    r.raise_for_status()
+                data = r.json()
+                break
         try:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as e:
             raise NimError(f"Unexpected NIM response shape: {data}") from e
+
+    @classmethod
+    def _backoff_delay(cls, attempt: int) -> float:
+        # Exponential backoff with jitter: 0.5s, 1s, 2s ± 25%
+        base = cls._BACKOFF_BASE_S * (2 ** attempt)
+        return base * (0.75 + random.random() * 0.5)
 
     async def complete_text(
         self,

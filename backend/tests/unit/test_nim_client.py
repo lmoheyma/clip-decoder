@@ -1,4 +1,6 @@
 import json
+import httpx
+import pytest
 import respx
 from httpx import Response
 from pathlib import Path
@@ -86,3 +88,45 @@ async def test_complete_text_retries_on_invalid_json(tmp_path: Path):
     )
     assert result == {"ok": True}
     assert route.call_count == 2
+
+
+@respx.mock
+async def test_complete_text_retries_on_502_then_succeeds(monkeypatch):
+    # Don't actually sleep between retries.
+    monkeypatch.setattr("app.nim.client.asyncio.sleep", lambda *_: _noop())
+    responses = [
+        Response(502, text="<html>502 Bad Gateway</html>"),
+        Response(502, text="<html>502 Bad Gateway</html>"),
+        Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}}]},
+        ),
+    ]
+    route = respx.post("https://example.test/v1/chat/completions").mock(
+        side_effect=responses
+    )
+    client = NimClient(api_key="nvapi-test", base_url="https://example.test/v1")
+    result = await client.complete_text(
+        model="m", messages=[{"role": "user", "content": "x"}], json_mode=False
+    )
+    assert result == "ok"
+    assert route.call_count == 3
+
+
+@respx.mock
+async def test_complete_text_raises_after_exhausting_5xx_retries(monkeypatch):
+    monkeypatch.setattr("app.nim.client.asyncio.sleep", lambda *_: _noop())
+    route = respx.post("https://example.test/v1/chat/completions").mock(
+        return_value=Response(503, text="unavailable")
+    )
+    client = NimClient(api_key="nvapi-test", base_url="https://example.test/v1")
+    with pytest.raises(httpx.HTTPStatusError) as exc:
+        await client.complete_text(
+            model="m", messages=[{"role": "user", "content": "x"}], json_mode=False
+        )
+    assert exc.value.response.status_code == 503
+    assert route.call_count == NimClient._MAX_TRANSIENT_RETRIES + 1
+
+
+async def _noop():
+    return None
