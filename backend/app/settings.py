@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     nvapi_key: str = ""
     nim_base_url: str = "https://integrate.api.nvidia.com/v1"
-    cosmos_reason_model: str = "google/paligemma"
+    cosmos_reason_model: str = "nvidia/nemotron-nano-12b-v2-vl"
     llm_model: str = "meta/llama-3.3-70b-instruct"
 
     frames_per_shot: int = 1
