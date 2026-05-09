@@ -169,3 +169,37 @@ async def test_merge_dedups_case_insensitive_pass1_wins():
     assert out[0].work_creator == "Dario Argento"
     assert out[0].timestamp_s == 12.5
     assert out[0].raw_confidence == 0.85
+
+
+async def test_pass2_failure_returns_pass1_only(caplog):
+    import httpx
+    nim = AsyncMock()
+    nim.complete_text.side_effect = [
+        {
+            "candidates": [
+                {
+                    "timestamp_s": 1.0,
+                    "source_frame_id": "shot_00",
+                    "work_title": "Solaris",
+                    "work_creator": "Andrei Tarkovsky",
+                    "work_year": 1972,
+                    "work_type": "film",
+                    "reasoning": "long static interior + reflective surface + somber palette",
+                    "raw_confidence": 0.7,
+                }
+            ]
+        },
+        httpx.HTTPStatusError(
+            "502", request=httpx.Request("POST", "https://x"),
+            response=httpx.Response(502),
+        ),
+    ]
+    rp = RefProposer(nim_client=nim, model="m")
+    with caplog.at_level("WARNING", logger="app.pipeline.ref_proposer"):
+        out = await rp.propose(
+            title="x", channel="y", lyrics_text="",
+            frame_analyses=[_fa("shot_00", 1.0)],
+        )
+    assert len(out) == 1
+    assert out[0].work_title == "Solaris"
+    assert any("pass 2 failed" in rec.message for rec in caplog.records)

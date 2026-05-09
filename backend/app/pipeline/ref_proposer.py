@@ -87,9 +87,15 @@ class RefProposer:
         pass1 = await self._call(self._tpl_general, base_ctx)
 
         types_covered = ", ".join(sorted({c.work_type for c in pass1})) or "(none)"
-        pass2 = await self._call(
-            self._tpl_complement,
-            {**base_ctx, "types_covered": _escape_braces(types_covered)},
-        )
+        try:
+            pass2 = await self._call(
+                self._tpl_complement,
+                {**base_ctx, "types_covered": _escape_braces(types_covered)},
+            )
+        except Exception as e:
+            logger.warning(
+                "ref proposer pass 2 failed (%s) — keeping pass 1 only", e,
+            )
+            pass2 = []
 
         return _merge(pass1, pass2)
