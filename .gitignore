@@ -24,3 +24,7 @@ out/
 
 # Logs
 *.log
+
+# Tooling
+.claude/
+frontend/pnpm-workspace.yaml
