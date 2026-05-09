@@ -29,6 +29,23 @@ def _format_frame_summaries(frames: Iterable[FrameAnalysis]) -> str:
     return _escape_braces("\n".join(blocks))
 
 
+def _merge(
+    pass1: list[ReferenceCandidate],
+    pass2: list[ReferenceCandidate],
+) -> list[ReferenceCandidate]:
+    """Concatenate pass 1 + pass 2, dedup on case-insensitive
+    (work_title, work_creator). Pass 1 entries always win on collision."""
+    seen: set[tuple[str, str]] = set()
+    out: list[ReferenceCandidate] = []
+    for c in pass1 + pass2:
+        key = (c.work_title.casefold(), c.work_creator.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(c)
+    return out
+
+
 class RefProposer:
     def __init__(self, nim_client: NimClient, model: str):
         self._nim = nim_client
@@ -75,4 +92,4 @@ class RefProposer:
             {**base_ctx, "types_covered": _escape_braces(types_covered)},
         )
 
-        return pass1 + pass2
+        return _merge(pass1, pass2)

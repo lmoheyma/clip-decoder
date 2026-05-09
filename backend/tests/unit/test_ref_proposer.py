@@ -40,7 +40,7 @@ async def test_proposes_named_candidates():
         lyrics_text="",
         frame_analyses=[_fa("shot_03", 12.5)],
     )
-    assert len(out) >= 1
+    assert len(out) == 1
     assert out[0].work_title == "The Shining"
 
 
@@ -124,3 +124,48 @@ async def test_propose_runs_two_passes_with_types_covered():
     # Both candidates surface
     titles = sorted(c.work_title for c in out)
     assert titles == ["Liberty Leading the People", "The Shining"]
+
+
+async def test_merge_dedups_case_insensitive_pass1_wins():
+    nim = AsyncMock()
+    pass1_payload = {
+        "candidates": [
+            {
+                "timestamp_s": 12.5,
+                "source_frame_id": "shot_03",
+                "work_title": "Suspiria",
+                "work_creator": "Dario Argento",
+                "work_year": 1977,
+                "work_type": "film",
+                "reasoning": "red light + symmetric corridor + ornate set",
+                "raw_confidence": 0.85,
+            }
+        ]
+    }
+    # Pass 2 returns the same work in different case — must be dedup'd.
+    pass2_payload = {
+        "candidates": [
+            {
+                "timestamp_s": 50.0,
+                "source_frame_id": "shot_10",
+                "work_title": "SUSPIRIA",
+                "work_creator": "dario argento",
+                "work_year": 1977,
+                "work_type": "film",
+                "reasoning": "red palette + dance studio + neon",
+                "raw_confidence": 0.4,
+            }
+        ]
+    }
+    nim.complete_text.side_effect = [pass1_payload, pass2_payload]
+    rp = RefProposer(nim_client=nim, model="m")
+    out = await rp.propose(
+        title="x", channel="y", lyrics_text="",
+        frame_analyses=[_fa("shot_03", 12.5)],
+    )
+    assert len(out) == 1
+    # Pass 1 wins: original casing, original timestamp, original confidence.
+    assert out[0].work_title == "Suspiria"
+    assert out[0].work_creator == "Dario Argento"
+    assert out[0].timestamp_s == 12.5
+    assert out[0].raw_confidence == 0.85
