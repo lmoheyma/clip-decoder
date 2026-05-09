@@ -61,10 +61,18 @@ class RefProposer:
         lyrics_text: str,
         frame_analyses: list[FrameAnalysis],
     ) -> list[ReferenceCandidate]:
-        ctx = {
+        base_ctx = {
             "title": _escape_braces(title or "(unknown)"),
             "channel": _escape_braces(channel or "(unknown)"),
             "lyrics": _escape_braces(lyrics_text or "(none)"),
             "frame_summaries": _format_frame_summaries(frame_analyses),
         }
-        return await self._call(self._tpl_general, ctx)
+        pass1 = await self._call(self._tpl_general, base_ctx)
+
+        types_covered = ", ".join(sorted({c.work_type for c in pass1})) or "(none)"
+        pass2 = await self._call(
+            self._tpl_complement,
+            {**base_ctx, "types_covered": _escape_braces(types_covered)},
+        )
+
+        return pass1 + pass2
