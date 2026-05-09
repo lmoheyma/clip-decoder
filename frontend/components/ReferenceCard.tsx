@@ -16,9 +16,21 @@ export function ReferenceCard({
   const isConfirmed = reference.final_confidence === "confirmed";
   const conf = Math.round(reference.raw_confidence * 100);
 
+  function handleKey(e: React.KeyboardEvent<HTMLElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onJump();
+    }
+  }
+
   return (
     <article
-      className="group relative rounded-comfy bg-white/[0.03] border border-white/10 p-5 flex flex-col gap-3 transition-all hover:bg-white/[0.06] hover:border-white/20 hover:shadow-aurora"
+      role="button"
+      tabIndex={0}
+      onClick={onJump}
+      onKeyDown={handleKey}
+      aria-label={`Jump to ${reference.work_title} at ${min}:${sec.toString().padStart(2, "0")}`}
+      className="group relative rounded-comfy bg-white/[0.03] border border-white/10 p-5 flex flex-col gap-3 cursor-pointer transition-all hover:bg-white/[0.06] hover:border-white/20 hover:shadow-aurora focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender/60"
     >
       <header className="flex items-center justify-between gap-2">
         <span className="font-mono uppercase text-[10px] tracking-mono-label text-white/55 inline-flex items-center gap-2">
@@ -37,12 +49,9 @@ export function ReferenceCard({
         </span>
       </header>
 
-      <button
-        onClick={onJump}
-        className="text-left font-display text-[22px] tracking-h3 leading-[1.1] hover:text-lavender transition-colors"
-      >
+      <h3 className="font-display text-[22px] tracking-h3 leading-[1.1] group-hover:text-lavender transition-colors">
         {reference.work_title}
-      </button>
+      </h3>
 
       <p className="font-mono uppercase text-[10px] tracking-mono-label text-white/55">
         {reference.work_creator}
@@ -90,7 +99,8 @@ export function ReferenceCard({
             href={reference.wikipedia_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono uppercase text-[10px] tracking-mono-label text-lavender inline-flex items-center gap-1.5 hover:underline underline-offset-4"
+            onClick={(e) => e.stopPropagation()}
+            className="font-mono uppercase text-[10px] tracking-mono-label text-lavender inline-flex items-center gap-1.5 hover:underline underline-offset-4 cursor-pointer"
           >
             Wikipedia <span aria-hidden>↗</span>
           </a>
@@ -101,7 +111,7 @@ export function ReferenceCard({
         )}
         <button
           onClick={(e) => { e.stopPropagation(); onFlag(); }}
-          className="font-mono uppercase text-[10px] tracking-mono-label text-white/55 hover:text-[#fc4c02] transition-colors"
+          className="font-mono uppercase text-[10px] tracking-mono-label text-white/55 hover:text-[#fc4c02] transition-colors cursor-pointer"
         >
           ✕ Not convinced
         </button>
