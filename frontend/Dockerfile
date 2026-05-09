@@ -7,13 +7,16 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # ─── dev ───────────────────────────────────────────────────────
 # Used by docker-compose.dev.yml. Source is bind-mounted at run
 # time, so we only bake node_modules and run `next dev` with HMR.
+# Invoke the next binary directly: pnpm 10+ runs an automatic
+# verify-deps-before-run check on `pnpm <script>` that races with
+# bind-mounted node_modules and crash-loops the container.
 FROM node:22-alpine AS dev
 WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 ENV NODE_ENV=development NEXT_TELEMETRY_DISABLED=1
 EXPOSE 3000
-CMD ["pnpm", "dev"]
+CMD ["node_modules/.bin/next", "dev", "-p", "3000"]
 
 FROM node:22-alpine AS builder
 WORKDIR /app

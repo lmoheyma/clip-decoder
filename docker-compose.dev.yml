@@ -7,8 +7,12 @@
 
 services:
   backend:
+    build:
+      context: ./backend
+      target: dev
     volumes:
       - ./backend/app:/app/app
+      - ./backend/tests:/app/tests
       - ./backend/data:/app/data
     command:
       - uvicorn

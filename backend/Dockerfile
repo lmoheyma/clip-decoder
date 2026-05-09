@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -18,11 +18,21 @@ WORKDIR /app
 
 # Lockfile-first install for cache friendliness
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
-
-COPY app ./app
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+# ─── dev ─────────────────────────────────────────────────────────
+# Used by docker-compose.dev.yml. Installs dev deps (pytest, ruff)
+# so we can run the unit suite inside the container while source
+# is bind-mounted.
+FROM base AS dev
+RUN uv sync --frozen
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# ─── prod (default) ──────────────────────────────────────────────
+FROM base AS prod
+RUN uv sync --frozen --no-dev
+COPY app ./app
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
