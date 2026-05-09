@@ -19,6 +19,12 @@ class EventBus:
     cleared lazily when a new run starts for the same id.
     """
 
+    # Pace at which buffered (replay) events are yielded to a new
+    # subscriber. Without this, React batches every state update from
+    # the burst into a single render and the pipeline display jumps
+    # from empty to "done" with no visible animation.
+    _REPLAY_PACE_S: float = 0.18
+
     def __init__(self):
         self._queues: dict[str, list[asyncio.Queue[PipelineEvent | None]]] = (
             defaultdict(list)
@@ -49,8 +55,13 @@ class EventBus:
             self._queues[youtube_id].append(q)
         terminated = backlog and backlog[-1].step in ("done", "error")
         try:
-            for ev in backlog:
+            # Yield the replay backlog with a small pace between events
+            # so React can render the progression rather than batching
+            # the burst into a single update.
+            for i, ev in enumerate(backlog):
                 yield ev
+                if i < len(backlog) - 1:
+                    await asyncio.sleep(self._REPLAY_PACE_S)
             if terminated:
                 return
             while True:

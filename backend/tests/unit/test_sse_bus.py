@@ -56,6 +56,31 @@ async def test_subscriber_after_done_replays_full_history():
 
 
 @pytest.mark.asyncio
+async def test_replay_is_paced_to_avoid_react_batching(monkeypatch):
+    bus = EventBus()
+    # Pre-populate a complete run so replay yields a known number of events.
+    for step, p in [("ingest", 0.1), ("shots", 0.2), ("vision", 0.55), ("done", 1.0)]:
+        await bus.publish("vid", _ev(step, p))
+
+    sleeps: list[float] = []
+    real_sleep = asyncio.sleep
+
+    async def recording_sleep(d, *args, **kwargs):
+        sleeps.append(d)
+        await real_sleep(0)  # advance loop without actual delay
+
+    monkeypatch.setattr("app.api.sse.asyncio.sleep", recording_sleep)
+
+    received = []
+    async for ev in bus.subscribe("vid"):
+        received.append(ev.step)
+
+    # 4 replay events ⇒ 3 inter-event waits of _REPLAY_PACE_S each.
+    assert received == ["ingest", "shots", "vision", "done"]
+    assert sleeps == [bus._REPLAY_PACE_S] * 3
+
+
+@pytest.mark.asyncio
 async def test_history_resets_for_new_run_on_same_id():
     bus = EventBus()
 
