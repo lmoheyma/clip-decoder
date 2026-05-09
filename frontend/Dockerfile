@@ -4,6 +4,17 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
+# ─── dev ───────────────────────────────────────────────────────
+# Used by docker-compose.dev.yml. Source is bind-mounted at run
+# time, so we only bake node_modules and run `next dev` with HMR.
+FROM node:22-alpine AS dev
+WORKDIR /app
+RUN corepack enable
+COPY --from=deps /app/node_modules ./node_modules
+ENV NODE_ENV=development NEXT_TELEMETRY_DISABLED=1
+EXPOSE 3000
+CMD ["pnpm", "dev"]
+
 FROM node:22-alpine AS builder
 WORKDIR /app
 RUN corepack enable

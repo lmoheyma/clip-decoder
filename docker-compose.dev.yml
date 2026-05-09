@@ -1,0 +1,47 @@
+# Dev override — bind-mounts source for hot reload on both services.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# The first run still builds (frontend dev target, backend image), but
+# subsequent code edits hot-reload in-place — no rebuild needed.
+
+services:
+  backend:
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/data:/app/data
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/app
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    volumes:
+      # Bind source for HMR. node_modules + .next are masked by named
+      # volumes so the container's installed deps + build cache survive
+      # bind-mount shadowing from the host.
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
+    environment:
+      # In-container hostname for the backend service (not localhost,
+      # which would loop back to the frontend container itself).
+      - BACKEND_URL=http://backend:8000
+      # WSL2 / Docker bind mounts don't always fire inotify events;
+      # polling makes Next.js' file-watcher pick up edits reliably.
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - NEXT_TELEMETRY_DISABLED=1
+
+volumes:
+  frontend_node_modules:
+  frontend_next_cache:
