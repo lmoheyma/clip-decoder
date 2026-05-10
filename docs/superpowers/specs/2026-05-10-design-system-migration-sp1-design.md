@@ -313,7 +313,7 @@ This file is touched only if Tailwind v4 requires explicit theme registration of
 
 - `frontend/app/report/**/*` — entire report subtree
 - `frontend/components/PipelineStatus.tsx`, `ReferenceCard.tsx`, `ReferencePanel.tsx`, `ConfidenceFilter.tsx`, `VideoPlayer.tsx` — all report-side components
-- All test files (logic tests pass without modification; classname-matching tests in `HeroForm.test.tsx` may need minor updates — see Testing)
+- All test files — they use semantic queries (`getByPlaceholderText`, `getByRole`) so no test code changes are required. See Testing strategy.
 - All backend code
 
 ### Files at repo root (untracked, kept as reference)
@@ -376,9 +376,9 @@ SP1 is complete when:
 - ✅ Hero h1 uses `.serif-it` with "quotation" word in `text-grad-lavender`, includes lede paragraph and help row with `<span class="kbd">⌘ V</span>`.
 - ✅ Right cite-stack contains exactly 4 hardcoded `RECENT_QUOTATIONS_DEMO` entries with `// TODO(SP6)` comment.
 - ✅ FooterStrip uses 5 `STEPS` entries with `Nemotron Nano VL` substituted for `Cosmos Reason`.
-- ✅ `HeroForm.tsx` rewritten with `.url-form` markup, `.btn-primary` submit button, all existing submit/loading/error logic preserved.
+- ✅ `HeroForm.tsx` rewritten with `.url-form` markup, `.btn-primary` submit button, all existing submit/busy/error logic preserved (state names `url`/`busy`/`error` retained, `startAnalysis` indirection retained).
 - ✅ `tailwind.config.ts`: old tokens (midnight/lavender/magenta/orange/mist/aurora) **retained** for report compatibility during SP1.
-- ✅ All existing tests pass: `cd frontend && pnpm test`. (Any classname-matching assertion in `HeroForm.test.tsx` updated to new class names.)
+- ✅ All existing tests pass: `cd frontend && pnpm test`. No test code changes required (existing tests use semantic queries that the new markup preserves).
 - ✅ Manual verification checklist (above) passes end-to-end.
 - ✅ Work on branch `feature/design-system-sp1`, merged into `main` after final review.
 
