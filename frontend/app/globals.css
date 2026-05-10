@@ -317,6 +317,7 @@ html, body {
 }
 .cite-card-disabled { cursor: default; }
 .cite-card-disabled:hover { border-color: var(--hairline); }
+.cite-card-speculative { border-style: dashed; opacity: 0.9; }
 
 .cite-stack { display: flex; flex-direction: column; gap: 12px; }
 

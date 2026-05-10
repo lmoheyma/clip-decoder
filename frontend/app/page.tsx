@@ -32,7 +32,7 @@ function Slate() {
       <span className="slate-version">v0.1 · local-first · NIM</span>
       <span className="sep" />
       <span className="tc slate-scene">scene 01 · take 01</span>
-      <span className="tc">{today || " "}</span>
+      <span className="tc">{today || " "}</span>
       <span className="tc slate-timecode">00:00:00:00</span>
       <span className="sep" />
       <span className="slate-docs">Docs</span>
@@ -45,7 +45,7 @@ function Stage({ onSubmit }: { onSubmit: (id: string) => void }) {
   return (
     <section
       className="relative grid gap-12 lg:grid-cols-[1fr_400px]"
-      style={{ padding: "clamp(32px, 5vw, 64px)", paddingTop: 48, paddingBottom: 48 }}
+      style={{ paddingLeft: "clamp(32px, 5vw, 64px)", paddingRight: "clamp(32px, 5vw, 64px)", paddingTop: 48, paddingBottom: 48 }}
     >
       {/* Left column — hero */}
       <div>
@@ -131,14 +131,8 @@ function Stage({ onSubmit }: { onSubmit: (id: string) => void }) {
               disabled
               aria-disabled="true"
               className={`cite-card cite-card-disabled${q.verdict === "speculative" ? " cite-card-speculative" : ""}`}
-              style={
-                q.verdict === "speculative"
-                  ? { borderStyle: "dashed", opacity: 0.9 }
-                  : undefined
-              }
             >
               <div
-                className="tc"
                 style={
                   q.verdict === "speculative"
                     ? { color: "var(--grad-sky)", fontSize: 13, letterSpacing: 0.13 }
@@ -180,14 +174,17 @@ export default function Home() {
     <main className="frame surface-dark relative min-h-screen flex flex-col">
       {/* Ambient orbs — only "voltage" of the new design */}
       <div
+        aria-hidden
         className="orb peach"
         style={{ top: -120, right: -80, width: 480, height: 480 }}
       />
       <div
+        aria-hidden
         className="orb lavender"
         style={{ bottom: -160, left: -100, width: 560, height: 560, animationDelay: "-12s" }}
       />
       <div
+        aria-hidden
         className="orb mint"
         style={{ top: "40%", left: "30%", width: 320, height: 320, opacity: 0.35, animationDelay: "-26s" }}
       />
