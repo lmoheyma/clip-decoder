@@ -23,13 +23,413 @@
   --font-mono: var(--font-plex-mono), "PP Neue Montreal Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   SP1 — New design system tokens (editorial register).
+   Coexist with the legacy tokens above until SP2 drops them.
+   ───────────────────────────────────────────────────────────────── */
+:root {
+  /* Surface */
+  --canvas:           #0c0a09;
+  --canvas-soft:      #14110f;
+  --surface-card:     #1c1917;
+  --surface-strong:   #292524;
+  --surface-dark:     #000000;
+
+  /* Hairlines */
+  --hairline:         rgba(255, 255, 255, 0.08);
+  --hairline-soft:    rgba(255, 255, 255, 0.05);
+  --hairline-strong:  rgba(255, 255, 255, 0.14);
+
+  /* Text */
+  --ink:              #f5f5f5;
+  --body:             #a8a29e;
+  --body-strong:      #e7e5e4;
+  --muted:            #777169;
+  --muted-soft:       #57534e;
+  --on-primary:       #0c0a09;
+
+  /* Pastel orb stops */
+  --grad-mint:        #a7e5d3;
+  --grad-peach:       #f4c5a8;
+  --grad-lavender:    #c8b8e0;
+  --grad-sky:         #a8c8e8;
+  --grad-rose:        #e8b8c4;
+
+  /* Semantic */
+  --success:          #4ade80;
+  --error:            #f87171;
+
+  /* Type — no `--mono` token: Inter is used for "mono" elements via uppercase + letter-spacing */
+  --sans:  var(--font-inter), system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --serif: var(--font-eb-garamond), "GT Sectra", "Times New Roman", serif;
+
+  /* Radii */
+  --r-1:    8px;
+  --r-2:    16px;
+  --r-3:    24px;
+  --r-pill: 9999px;
+
+  /* Shadow */
+  --shadow-1: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Expose new tokens to Tailwind v4 utility generation. */
+@theme {
+  --color-canvas:         var(--canvas);
+  --color-canvas-soft:    var(--canvas-soft);
+  --color-surface-card:   var(--surface-card);
+  --color-surface-strong: var(--surface-strong);
+  --color-ink:            var(--ink);
+  --color-body:           var(--body);
+  --color-body-strong:    var(--body-strong);
+  --color-muted:          var(--muted);
+  --color-muted-soft:     var(--muted-soft);
+  --color-grad-mint:      var(--grad-mint);
+  --color-grad-peach:     var(--grad-peach);
+  --color-grad-lavender:  var(--grad-lavender);
+  --color-grad-sky:       var(--grad-sky);
+  --color-grad-rose:      var(--grad-rose);
+  --color-success:        var(--success);
+  --color-error:          var(--error);
+  --font-sans:            var(--sans);
+  --font-serif:           var(--serif);
+  --shadow-1:             0 4px 24px rgba(0, 0, 0, 0.4);
+  --radius-1:             var(--r-1);
+  --radius-2:             var(--r-2);
+  --radius-3:             var(--r-3);
+  --radius-pill:          var(--r-pill);
+}
+
 html, body {
-  font-family: var(--font-display);
-  letter-spacing: -0.16px;
-  background: #ffffff;
-  color: #000000;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-feature-settings: "ss01", "cv11";
+  /* Inter optical default — slightly open (legacy used -0.16px for Bricolage). */
+  letter-spacing: 0.16px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SP1 — Component primitives (editorial register).
+   Slate, buttons, chips, kbd, type primitives.
+   ───────────────────────────────────────────────────────────────── */
+
+/* ─── Type primitives ─────────────────────────── */
+.uc {
+  text-transform: uppercase;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+}
+
+.hairline {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+}
+
+.hairline-mono {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--body);
+  letter-spacing: 0.13px;
+}
+
+.serif-it {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-style: normal;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+/* ─── Slate (top bar) ─────────────────────────── */
+.slate {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 32px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--body);
+  letter-spacing: 0.14px;
+}
+.slate .dot {
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle at 30% 30%, var(--grad-peach), var(--grad-rose));
+  border-radius: 50%;
+}
+.slate .sep { flex: 1; height: 1px; background: transparent; }
+.slate .tc  { color: var(--muted); font-size: 13px; letter-spacing: 0.13px; }
+.slate b {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* ─── Buttons ─────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  height: 40px;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-primary);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: var(--hairline-strong);
+  color: var(--ink);
+}
+
+/* ─── Chips ───────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--body);
+  background: var(--surface-strong);
+}
+.chip .num { color: var(--ink); font-weight: 700; }
+.chip-amber {
+  background: color-mix(in oklab, var(--grad-peach) 18%, var(--surface-strong));
+  border-color: color-mix(in oklab, var(--grad-peach) 30%, transparent);
+  color: var(--grad-peach);
+}
+.chip-cyan {
+  background: color-mix(in oklab, var(--grad-sky) 16%, var(--surface-strong));
+  border-color: color-mix(in oklab, var(--grad-sky) 30%, transparent);
+  color: var(--grad-sky);
+}
+.chip-dim { color: var(--muted); }
+
+/* ─── Keyboard chip ───────────────────────────── */
+.kbd {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 6px;
+  color: var(--body);
+  background: var(--surface-strong);
+}
+
+/* ─── Frame & surface helpers ─────────────────────────── */
+.frame { position: relative; overflow: hidden; }
+.surface-dark { background: var(--canvas); color: var(--ink); }
+
+/* ─── Atmospheric gradient orb ────────────────── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+  animation: orb-drift 40s ease-in-out infinite alternate;
+}
+.orb.mint     { background: radial-gradient(circle, var(--grad-mint),     transparent 70%); }
+.orb.peach    { background: radial-gradient(circle, var(--grad-peach),    transparent 70%); }
+.orb.lavender { background: radial-gradient(circle, var(--grad-lavender), transparent 70%); }
+.orb.sky      { background: radial-gradient(circle, var(--grad-sky),      transparent 70%); }
+.orb.rose     { background: radial-gradient(circle, var(--grad-rose),     transparent 70%); }
+
+@keyframes orb-drift {
+  from { transform: translate3d(0, 0, 0)      scale(1);    }
+  to   { transform: translate3d(2%, -1.5%, 0) scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb { animation: none; }
+}
+
+/* ─── Cite cards (right column) ───────────────────────────────── */
+.cite-card {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-2);
+  padding: 20px 22px;
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.18s ease;
+}
+.cite-card h4 {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 300;
+  color: var(--ink);
+  margin: 6px 0 4px;
+  letter-spacing: -0.22px;
+  line-height: 1.18;
+}
+.cite-card .arrow {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  color: var(--body);
+  font-size: 14px;
+}
+.cite-card-disabled { cursor: default; }
+.cite-card-disabled:hover { border-color: var(--hairline); }
+.cite-card-speculative { border-style: dashed; opacity: 0.9; }
+
+.cite-stack { display: flex; flex-direction: column; gap: 12px; }
+
+/* ─── URL form (.url-form) ────────────────────────────────────── */
+.url-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-pill);
+  padding: 4px 4px 4px 16px;
+  background: var(--canvas-soft);
+  max-width: 640px;
+  width: 100%;
+  transition: border-color 0.2s ease;
+}
+.url-form:focus-within { border-color: var(--ink); }
+.url-form .pre {
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-family: var(--sans);
+}
+.url-form input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 12px 8px;
+  font-size: 16px;
+  font-family: var(--sans);
+  letter-spacing: 0;
+  min-width: 0;
+}
+.url-form input::placeholder { color: var(--muted-soft); }
+.url-form .btn-primary { flex-shrink: 0; }
+
+/* Error message */
+.error {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--error);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  font-family: var(--sans);
+}
+
+/* ─── Footer-strip (5-step pipeline preview) ─────────────────── */
+.footer-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 24px;
+  padding: 32px 64px;
+  border-top: 1px solid var(--hairline);
+  background: var(--canvas);
+}
+.footer-strip > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.footer-strip .step {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+}
+.footer-strip .num {
+  font-family: var(--serif);
+  font-style: normal;
+  font-weight: 300;
+  font-size: 22px;
+  color: var(--ink);
+  letter-spacing: -0.22px;
+  line-height: 1.1;
+}
+.footer-strip .desc {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--body);
+  letter-spacing: 0.13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .footer-strip {
+    grid-template-columns: 1fr;
+    padding: 24px 32px;
+    gap: 18px;
+  }
+}
+
+/* ─── Slate mobile (≤ 640px): keep brand + dot + date only ─── */
+@media (max-width: 639px) {
+  .slate {
+    padding: 14px 20px;
+    gap: 12px;
+    flex-wrap: nowrap;
+  }
+  .slate .slate-version,
+  .slate .slate-scene,
+  .slate .slate-timecode,
+  .slate .slate-docs,
+  .slate .slate-github { display: none; }
+  .slate .sep:not(:first-of-type) { display: none; }
 }
 
 /* ─────────────────────────────────────────────────────────────────

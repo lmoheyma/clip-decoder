@@ -1,175 +1,201 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HeroForm } from "@/components/HeroForm";
 
-const STATS: { value: string; label: string }[] = [
-  { value: "≈ 80", label: "shots / video" },
-  { value: "12+", label: "reference types surfaced" },
-  { value: "0¢", label: "stored on our side" },
+const RECENT_QUOTATIONS_DEMO = [
+  { time: "00:42", verdict: "confirmed" as const,   title: "Le faux miroir",                creator: "René Magritte",    year: 1929, type: "Painting" },
+  { time: "01:18", verdict: "confirmed" as const,   title: "The Calling of Saint Matthew", creator: "Caravaggio",       year: 1600, type: "Painting" },
+  { time: "02:04", verdict: "speculative" as const, title: "Stalker",                      creator: "Andrei Tarkovsky", year: 1979, type: "Film"     },
+  { time: "02:51", verdict: "confirmed" as const,   title: "Meshes of the Afternoon",      creator: "Maya Deren",       year: 1943, type: "Film"     },
+];
+// TODO(SP6): replace RECENT_QUOTATIONS_DEMO with dynamic GET /api/recent-references
+// once the endpoint exists. Until then, this is curated demo content.
+
+const STEPS = [
+  { step: "01 — ingest",    tool: "yt-dlp",             desc: "Pulls the clip at 480p plus auto-captions if available." },
+  { step: "02 — shots",     tool: "PySceneDetect",      desc: "Cuts on shot boundaries; one keyframe per shot, capped at 80." },
+  { step: "03 — vision",    tool: "Nemotron Nano VL",   desc: "Composition, palette, camera, costume — evidence only." },
+  { step: "04 — cross-ref", tool: "Llama 3.x",          desc: "Names the works the frames may be quoting." },
+  { step: "05 — verify",    tool: "Adversarial + Wiki", desc: "A second pass defends each claim. Wikipedia confirms it exists." },
 ];
 
-const SUPPORTED: string[] = [
-  "FILMS",
-  "MUSIC VIDEOS",
-  "PAINTINGS",
-  "PHOTOGRAPHS",
-  "ARCHIVAL FOOTAGE",
-  "ALBUM ART",
-  "AD CAMPAIGNS",
-  "FASHION EDITORIALS",
-];
+function Slate() {
+  const [today, setToday] = useState("");
+  useEffect(() => {
+    setToday(new Date().toISOString().slice(0, 10).replaceAll("-", "·"));
+  }, []);
+  return (
+    <div className="slate">
+      <span className="dot" />
+      <b>ClipDecoder</b>
+      <span className="slate-version">v0.1 · local-first · NIM</span>
+      <span className="sep" />
+      <span className="tc slate-scene">scene 01 · take 01</span>
+      <span className="tc">{today || " "}</span>
+      <span className="tc slate-timecode">00:00:00:00</span>
+      <span className="sep" />
+      <span className="slate-docs">Docs</span>
+      <span className="slate-github">GitHub ↗</span>
+    </div>
+  );
+}
+
+function Stage({ onSubmit }: { onSubmit: (id: string) => void }) {
+  return (
+    <section
+      className="relative grid gap-12 lg:grid-cols-[1fr_400px]"
+      style={{ paddingLeft: "clamp(32px, 5vw, 64px)", paddingRight: "clamp(32px, 5vw, 64px)", paddingTop: 48, paddingBottom: 48 }}
+    >
+      {/* Left column — hero */}
+      <div>
+        <div className="hairline" style={{ marginBottom: 18 }}>
+          A local tool · NIM · Wikipedia-verified
+        </div>
+        <h1
+          className="serif-it"
+          style={{
+            fontSize: "clamp(72px, 9vw, 144px)",
+            lineHeight: 0.96,
+            margin: 0,
+          }}
+        >
+          Every shot
+          <br />
+          is a{" "}
+          <em style={{ color: "var(--grad-lavender)", fontStyle: "italic" }}>
+            quotation.
+          </em>
+          <span
+            style={{
+              display: "block",
+              fontSize: "0.36em",
+              marginTop: 24,
+              color: "var(--body)",
+              fontStyle: "normal",
+            }}
+          >
+            We name the source.
+          </span>
+        </h1>
+
+        <p
+          style={{
+            maxWidth: 640,
+            marginTop: 32,
+            fontSize: 18,
+            lineHeight: 1.5,
+            color: "var(--body)",
+            letterSpacing: 0.18,
+          }}
+        >
+          Paste a music video. ClipDecoder splits it into shots, asks a vision
+          model what it sees, then cross-references each frame against a library
+          of films, paintings, photographs, and other clips — returning
+          evidence-grounded candidates the artist may be quoting.
+        </p>
+
+        <div style={{ marginTop: 32 }}>
+          <HeroForm onSubmit={(r) => onSubmit(r.youtube_id)} />
+        </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 24,
+            fontFamily: "var(--serif)",
+            fontStyle: "italic",
+            fontSize: 14,
+            color: "var(--body)",
+          }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span className="kbd">⌘ V</span> paste from clipboard
+          </span>
+          <span>YouTube only · 480p · ~90s analysis</span>
+        </div>
+      </div>
+
+      {/* Right column — recent quotations (static demo, see TODO) */}
+      <aside>
+        <div className="hairline" style={{ marginBottom: 10, paddingLeft: 4 }}>
+          Recent quotations we've found
+        </div>
+        <div className="cite-stack">
+          {RECENT_QUOTATIONS_DEMO.map((q) => (
+            <button
+              key={`${q.time}-${q.title}`}
+              type="button"
+              disabled
+              aria-disabled="true"
+              className={`cite-card cite-card-disabled${q.verdict === "speculative" ? " cite-card-speculative" : ""}`}
+            >
+              <div
+                style={
+                  q.verdict === "speculative"
+                    ? { color: "var(--grad-sky)", fontSize: 13, letterSpacing: 0.13 }
+                    : { color: "var(--muted)", fontSize: 13, letterSpacing: 0.13 }
+                }
+              >
+                {q.time} · {q.verdict}
+              </div>
+              <h4>{q.title}</h4>
+              <div style={{ fontSize: 13, color: "var(--body)", letterSpacing: 0.13 }}>
+                {q.creator} · {q.year} · {q.type}
+              </div>
+              <span className="arrow">↗</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    </section>
+  );
+}
+
+function FooterStrip() {
+  return (
+    <footer className="footer-strip">
+      {STEPS.map((s) => (
+        <div key={s.step}>
+          <span className="step">{s.step}</span>
+          <span className="num">{s.tool}</span>
+          <span className="desc">{s.desc}</span>
+        </div>
+      ))}
+    </footer>
+  );
+}
 
 export default function Home() {
   const router = useRouter();
   return (
-    <main className="relative min-h-screen flex flex-col bg-dawn-cloud overflow-hidden">
-      {/* Decorative aurora orb — pure illustration, brand colors allowed */}
+    <main className="frame surface-dark relative min-h-screen flex flex-col">
+      {/* Ambient orbs — only "voltage" of the new design */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-40 -top-40 w-[640px] h-[640px] rounded-full float-slow"
-        style={{
-          background:
-            "radial-gradient(closest-side, rgba(239,44,193,0.55), rgba(189,187,255,0.35) 45%, rgba(252,76,2,0.25) 70%, transparent 80%)",
-          filter: "blur(28px)",
-        }}
+        className="orb peach"
+        style={{ top: -120, right: -80, width: 480, height: 480 }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-32 bottom-10 w-[480px] h-[480px] rounded-full float-slow"
-        style={{
-          background:
-            "radial-gradient(closest-side, rgba(189,187,255,0.55), rgba(239,44,193,0.18) 50%, transparent 75%)",
-          filter: "blur(22px)",
-          animationDelay: "-6s",
-        }}
+        className="orb lavender"
+        style={{ bottom: -160, left: -100, width: 560, height: 560, animationDelay: "-12s" }}
+      />
+      <div
+        aria-hidden
+        className="orb mint"
+        style={{ top: "40%", left: "30%", width: 320, height: 320, opacity: 0.35, animationDelay: "-26s" }}
       />
 
-      {/* ─── Top nav ─────────────────────────────────────────────── */}
-      <nav className="relative z-10 px-8 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="block w-2.5 h-2.5 rounded-full bg-midnight" />
-          <span className="font-mono uppercase text-[12px] tracking-mono-label">
-            ClipDecoder
-          </span>
+      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1 }}>
+        <Slate />
+        <div style={{ flex: 1 }}>
+          <Stage onSubmit={(id) => router.push(`/report/${id}`)} />
         </div>
-        <div className="hidden md:flex items-center gap-8 font-mono uppercase text-[11px] tracking-mono-label text-black/60">
-          <span>v0.1 · evidence-first</span>
-          <span className="inline-flex items-center gap-2">
-            <span className="block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            backend live
-          </span>
-        </div>
-      </nav>
-
-      {/* ─── Hero ────────────────────────────────────────────────── */}
-      <section className="relative z-10 flex-1 px-8 pt-10 md:pt-20 pb-32 max-w-[1240px] w-full mx-auto reveal">
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 lg:col-span-9">
-            <p
-              className="reveal-child font-mono uppercase text-[11px] tracking-mono-label text-black/55 mb-8"
-              style={{ ["--d" as never]: "60ms" }}
-            >
-              ⟢ A vision pipeline for visual literacy
-            </p>
-
-            <h1
-              className="reveal-child font-display tracking-display leading-[0.95] text-[12vw] md:text-[104px]"
-              style={{ ["--d" as never]: "140ms" }}
-            >
-              Decode the
-              <br />
-              <span className="text-aurora italic font-light mr-[0.18em]">visual</span>
-              references
-              <br />
-              in any clip.
-            </h1>
-
-            <p
-              className="reveal-child mt-8 max-w-[640px] text-[18px] leading-[1.4] tracking-body text-black/70"
-              style={{ ["--d" as never]: "260ms" }}
-            >
-              Paste a YouTube URL. We sample shots, run a vision model on every key
-              frame, propose grounded references, then verify each one against the
-              frame evidence and Wikipedia. You get an annotated viewer — with
-              named films, paintings, photographs, and other clips you can actually
-              click through.
-            </p>
-
-            <div
-              className="reveal-child mt-12"
-              style={{ ["--d" as never]: "380ms" }}
-            >
-              <HeroForm onSubmit={(r) => router.push(`/report/${r.youtube_id}`)} />
-            </div>
-          </div>
-
-          {/* Stats column */}
-          <aside
-            className="reveal-child col-span-12 lg:col-span-3 mt-12 lg:mt-0 flex lg:flex-col gap-4"
-            style={{ ["--d" as never]: "500ms" }}
-          >
-            {STATS.map((s, i) => (
-              <div
-                key={s.label}
-                className="flex-1 glass-light rounded-comfy p-5 shadow-midnight"
-                style={{ transform: `translateY(${i * 6}px)` }}
-              >
-                <div className="font-display font-medium tracking-h2 text-[44px] leading-[1]">
-                  {s.value}
-                </div>
-                <div className="mt-2 font-mono uppercase text-[10px] tracking-mono-label text-black/55">
-                  {s.label}
-                </div>
-              </div>
-            ))}
-          </aside>
-        </div>
-
-        {/* Pipeline trace strip */}
-        <div
-          className="reveal-child mt-20 flex items-center gap-4 font-mono uppercase text-[10px] tracking-mono-label text-black/55"
-          style={{ ["--d" as never]: "640ms" }}
-        >
-          <span className="block w-10 h-px bg-black/15" />
-          <span>Ingest</span>
-          <span className="text-black/25">→</span>
-          <span>Shots</span>
-          <span className="text-black/25">→</span>
-          <span>Vision</span>
-          <span className="text-black/25">→</span>
-          <span>Cross-ref</span>
-          <span className="text-black/25">→</span>
-          <span>Verify</span>
-          <span className="block flex-1 h-px bg-gradient-to-r from-black/15 via-[#ef2cc1]/40 to-transparent" />
-        </div>
-      </section>
-
-      {/* ─── Marquee of supported sources ────────────────────────── */}
-      <section className="relative z-10 border-t border-black/10 py-6 overflow-hidden">
-        <div className="marquee font-mono uppercase text-[11px] tracking-mono-label text-black/55">
-          {[...SUPPORTED, ...SUPPORTED].map((s, i) => (
-            <span key={i} className="flex items-center gap-3">
-              <span className="block w-1 h-1 rounded-full bg-[#ef2cc1]" />
-              {s}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── Footer wordmark ─────────────────────────────────────── */}
-      <footer className="relative z-10 px-8 pt-24 pb-6 flex flex-col gap-10 overflow-hidden">
-        <div className="flex items-end justify-between gap-6">
-          <h2 className="wordmark-foot leading-none text-midnight/15">clipdecoder</h2>
-          <div className="hidden md:block max-w-[280px] text-[12px] text-black/55 leading-[1.4]">
-            Built on NVIDIA NIM endpoints. Frame analyses, reference proposals, and
-            verification all run as one pipeline — locally streamed via SSE.
-          </div>
-        </div>
-        <div className="flex items-center justify-between font-mono uppercase text-[10px] tracking-mono-label text-black/45">
-          <span>© {new Date().getFullYear()} clipdecoder</span>
-          <span>made for visual obsessives</span>
-        </div>
-      </footer>
+        <FooterStrip />
+      </div>
     </main>
   );
 }
