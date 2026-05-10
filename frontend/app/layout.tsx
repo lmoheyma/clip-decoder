@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { EB_Garamond, Inter } from "next/font/google";
 
+// EB Garamond loaded with italic for the "quotation." accent in the hero h1.
 const ebGaramond = EB_Garamond({
   subsets: ["latin"],
   weight: ["400"],
@@ -12,7 +13,6 @@ const ebGaramond = EB_Garamond({
 
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   variable: "--font-inter",
   display: "swap",
 });
