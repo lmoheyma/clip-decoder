@@ -1,25 +1,26 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, IBM_Plex_Mono } from "next/font/google";
+import { EB_Garamond, Inter } from "next/font/google";
 
-const bricolage = Bricolage_Grotesque({
+const ebGaramond = EB_Garamond({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-bricolage",
+  weight: ["400", "500", "600", "700", "800"],
+  style: ["normal", "italic"],
+  variable: "--font-eb-garamond",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-plex-mono",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-inter",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "ClipDecoder — Decode the visual references in any clip",
+  title: "ClipDecoder — Every shot is a quotation. We name the source.",
   description:
-    "Paste a YouTube URL. Get an annotated viewer with named, evidence-grounded references — films, paintings, photographs, other clips.",
+    "Paste a music video. ClipDecoder splits it into shots, asks a vision model what it sees, then cross-references each frame against a library of films, paintings, photographs, and other clips.",
 };
 
 export default function RootLayout({
@@ -28,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${ebGaramond.variable} ${inter.variable}`}>
       <body>{children}</body>
     </html>
   );
