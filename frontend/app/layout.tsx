@@ -4,7 +4,7 @@ import { EB_Garamond, Inter } from "next/font/google";
 
 const ebGaramond = EB_Garamond({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400"],
   style: ["normal", "italic"],
   variable: "--font-eb-garamond",
   display: "swap",
