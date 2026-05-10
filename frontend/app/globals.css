@@ -256,6 +256,35 @@ html, body {
   background: var(--surface-strong);
 }
 
+/* ─── Frame & surface helpers ─────────────────────────── */
+.frame { position: relative; overflow: hidden; }
+.surface-dark { background: var(--canvas); color: var(--ink); }
+
+/* ─── Atmospheric gradient orb ────────────────── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+  animation: orb-drift 40s ease-in-out infinite alternate;
+}
+.orb.mint     { background: radial-gradient(circle, var(--grad-mint),     transparent 70%); }
+.orb.peach    { background: radial-gradient(circle, var(--grad-peach),    transparent 70%); }
+.orb.lavender { background: radial-gradient(circle, var(--grad-lavender), transparent 70%); }
+.orb.sky      { background: radial-gradient(circle, var(--grad-sky),      transparent 70%); }
+.orb.rose     { background: radial-gradient(circle, var(--grad-rose),     transparent 70%); }
+
+@keyframes orb-drift {
+  from { transform: translate3d(0, 0, 0)      scale(1);    }
+  to   { transform: translate3d(2%, -1.5%, 0) scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb { animation: none; }
+}
+
 /* ─────────────────────────────────────────────────────────────────
    Surface treatments
    ───────────────────────────────────────────────────────────────── */
