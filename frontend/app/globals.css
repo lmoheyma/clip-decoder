@@ -93,11 +93,11 @@
   --color-error:          var(--error);
   --font-sans:            var(--sans);
   --font-serif:           var(--serif);
-  --shadow-1:             var(--shadow-1);
-  --radius-1:             8px;
-  --radius-2:             16px;
-  --radius-3:             24px;
-  --radius-pill:          9999px;
+  --shadow-1:             0 4px 24px rgba(0, 0, 0, 0.4);
+  --radius-1:             var(--r-1);
+  --radius-2:             var(--r-2);
+  --radius-3:             var(--r-3);
+  --radius-pill:          var(--r-pill);
 }
 
 html, body {
@@ -105,6 +105,7 @@ html, body {
   color: var(--ink);
   font-family: var(--sans);
   font-feature-settings: "ss01", "cv11";
+  /* Inter optical default — slightly open (legacy used -0.16px for Bricolage). */
   letter-spacing: 0.16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
