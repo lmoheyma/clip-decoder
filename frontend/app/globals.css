@@ -416,6 +416,21 @@ html, body {
   }
 }
 
+/* ─── Slate mobile (≤ 640px): keep brand + dot + date only ─── */
+@media (max-width: 639px) {
+  .slate {
+    padding: 14px 20px;
+    gap: 12px;
+    flex-wrap: nowrap;
+  }
+  .slate .slate-version,
+  .slate .slate-scene,
+  .slate .slate-timecode,
+  .slate .slate-docs,
+  .slate .slate-github { display: none; }
+  .slate .sep:not(:first-of-type) { display: none; }
+}
+
 /* ─────────────────────────────────────────────────────────────────
    Surface treatments
    ───────────────────────────────────────────────────────────────── */
