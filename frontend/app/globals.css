@@ -23,12 +23,91 @@
   --font-mono: var(--font-plex-mono), "PP Neue Montreal Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   SP1 — New design system tokens (editorial register).
+   Coexist with the legacy tokens above until SP2 drops them.
+   ───────────────────────────────────────────────────────────────── */
+:root {
+  /* Surface */
+  --canvas:           #0c0a09;
+  --canvas-soft:      #14110f;
+  --surface-card:     #1c1917;
+  --surface-strong:   #292524;
+  --surface-dark:     #000000;
+
+  /* Hairlines */
+  --hairline:         rgba(255, 255, 255, 0.08);
+  --hairline-soft:    rgba(255, 255, 255, 0.05);
+  --hairline-strong:  rgba(255, 255, 255, 0.14);
+
+  /* Text */
+  --ink:              #f5f5f5;
+  --body:             #a8a29e;
+  --body-strong:      #e7e5e4;
+  --muted:            #777169;
+  --muted-soft:       #57534e;
+  --on-primary:       #0c0a09;
+
+  /* Pastel orb stops */
+  --grad-mint:        #a7e5d3;
+  --grad-peach:       #f4c5a8;
+  --grad-lavender:    #c8b8e0;
+  --grad-sky:         #a8c8e8;
+  --grad-rose:        #e8b8c4;
+
+  /* Semantic */
+  --success:          #4ade80;
+  --error:            #f87171;
+
+  /* Type — no `--mono` token: Inter is used for "mono" elements via uppercase + letter-spacing */
+  --sans:  var(--font-inter), system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --serif: var(--font-eb-garamond), "GT Sectra", "Times New Roman", serif;
+
+  /* Radii */
+  --r-1:    8px;
+  --r-2:    16px;
+  --r-3:    24px;
+  --r-pill: 9999px;
+
+  /* Shadow */
+  --shadow-1: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Expose new tokens to Tailwind v4 utility generation. */
+@theme {
+  --color-canvas:         var(--canvas);
+  --color-canvas-soft:    var(--canvas-soft);
+  --color-surface-card:   var(--surface-card);
+  --color-surface-strong: var(--surface-strong);
+  --color-ink:            var(--ink);
+  --color-body:           var(--body);
+  --color-body-strong:    var(--body-strong);
+  --color-muted:          var(--muted);
+  --color-muted-soft:     var(--muted-soft);
+  --color-grad-mint:      var(--grad-mint);
+  --color-grad-peach:     var(--grad-peach);
+  --color-grad-lavender:  var(--grad-lavender);
+  --color-grad-sky:       var(--grad-sky);
+  --color-grad-rose:      var(--grad-rose);
+  --color-success:        var(--success);
+  --color-error:          var(--error);
+  --font-sans:            var(--sans);
+  --font-serif:           var(--serif);
+  --shadow-1:             var(--shadow-1);
+  --radius-1:             8px;
+  --radius-2:             16px;
+  --radius-3:             24px;
+  --radius-pill:          9999px;
+}
+
 html, body {
-  font-family: var(--font-display);
-  letter-spacing: -0.16px;
-  background: #ffffff;
-  color: #000000;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-feature-settings: "ss01", "cv11";
+  letter-spacing: 0.16px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
