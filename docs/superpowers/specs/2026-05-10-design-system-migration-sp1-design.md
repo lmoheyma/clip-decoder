@@ -21,7 +21,7 @@ Migrate the frontend visual identity from the current "tech-forward" aesthetic (
 |---|---|---|
 | Scope of SP1 | Landing only; report stays on old design | Report will be redone in SP2 with new features; double-reskin is wasted work |
 | Token integration | Hybrid: Tailwind v4 `@theme` for tokens + plain CSS component classes for distinctive motifs | Utilities for one-shot layout; component classes for repeated motifs (`.orb`, `.serif-it`, `.cite-card`, `.btn`) |
-| Report visual during SP1 | Cutover global, accept temporary breakage | Pragmatic — old tokens stay in `tailwind.config.ts` so utility classes still resolve; only `body` background contrast is broken |
+| Report visual during SP1 | Cutover global; both old and new component classes coexist in `globals.css` until SP2 drops the old | Old utility classes (`bg-deep-sky`, `text-aurora`, `glass-light`, `marquee`, `wordmark-foot`, `shadow-aurora`, `font-display`, `tracking-mono-label`, etc.) and old keyframes (`drift`) **stay** so the report continues rendering its layout. Only the `body { background: var(--canvas) }` global makes the report look chromatically wrong — that's the accepted breakage. Functional regression of the report is **not** accepted. |
 | "Recent quotations" section | Static demo with TODO comment | Avoid empty/poor section if dynamic; mark for future activation |
 | Fonts | EB Garamond 300 (display) + Inter (sans + mono); drop Bricolage Grotesque + IBM Plex Mono | Strict editorial register; intentional absence of monospace per design |
 | Motion | Very subtle ambient orb drift (40s+) only; no reveal staggered, no marquee | Editorial register is quiet; one slow motion adds life without violating tone |
@@ -67,10 +67,13 @@ Replace existing `:root` tokens (`--color-midnight`, `--color-lavender`, `--colo
   --success:          #4ade80;
   --error:            #f87171;
 
-  /* Type */
+  /* Type
+     Note: no `--mono`. The new design uses Inter for everything;
+     the absence of monospace is intentional. The few "technical"
+     elements (`.kbd`, `.tc`, `.uc`) achieve a forensic feel via
+     uppercase + letter-spacing on Inter, not via a true mono font. */
   --sans:  var(--font-inter), system-ui, -apple-system, "Helvetica Neue", sans-serif;
   --serif: var(--font-eb-garamond), "GT Sectra", "Times New Roman", serif;
-  --mono:  var(--font-inter), system-ui, sans-serif;
 
   /* Radii */
   --r-1:    8px;
@@ -105,7 +108,6 @@ These are also exposed via Tailwind v4 `@theme` block so utility classes are aut
   --color-error: var(--error);
   --font-sans: var(--sans);
   --font-serif: var(--serif);
-  --font-mono: var(--mono);
   --shadow-1: var(--shadow-1);
   --radius-1: 8px;
   --radius-2: 16px;
@@ -126,7 +128,9 @@ Component classes carried over verbatim from `styles.css`:
 - `.frame` (positioned ancestor for orbs)
 - `.surface-dark`, `.surface-helpers` block
 
-Old classes dropped: `.bg-pastel-cloud`, `.bg-dawn-cloud`, `.bg-deep-sky`, `.text-aurora`, `.glass-light`, `.float-slow`, `.marquee`, `.reveal*`, `.wordmark-foot`, `.tracking-mono-label`, `.tracking-display`, `.shadow-aurora`.
+**Old classes kept temporarily (used by the report subtree, dropped in SP2)**: `.bg-pastel-cloud`, `.bg-dawn-cloud` (and its `::before` rule), `.bg-deep-sky` (and its `::before` rule), `.text-aurora`, `.glass-light`, `.float-slow`, `.marquee`, `.wordmark-foot`, `.shadow-aurora`, `@keyframes drift`, `.aurora-ring`, `.btn-midnight`, `.rounded-sharp`, `.rounded-comfy`. These stay in `globals.css` alongside the new tokens and component classes throughout SP1. The only old base styling overridden is `html, body { background, color, font-family }` — the new dark canvas + Inter become global, which is exactly the accepted "report looks chromatically wrong" breakage.
+
+**Classes safe to drop** (not used outside the landing): `.reveal*` (only used on landing's hero entrance, which is being rewritten with no animation).
 
 Single new animation:
 
@@ -210,11 +214,15 @@ useEffect(() => {
 
 `scene 01 · take 01` and `00:00:00:00` are hardcoded decorative literals.
 
-**Stage** — grid `lg:grid-cols-[1fr,400px]` with gap-12, padding `48px 64px`. Mobile collapses to single column.
+**Stage** — responsive grid:
+- `< 1024px` (below `lg`): single column (`grid-cols-1`), cite-stack stacks below the hero.
+- `≥ 1024px` (`lg`): two columns `lg:grid-cols-[1fr,400px]`, hero left and cite-stack right (matches index.html `.stage` layout intent).
+
+Padding `clamp(32px, 5vw, 64px)` horizontal, `48px` vertical. Gap `48px`.
 
 Left column:
 - `<div class="hairline">A local tool · NIM · Wikipedia-verified</div>`
-- `<h1>` with serif-it, font-size `clamp(72px, 9vw, 144px)`, line-height 0.96. "Every shot<br/>is a <em class="text-grad-lavender">quotation.</em>" The `<em>` uses Tailwind utility `text-grad-lavender` (auto-generated from `--color-grad-lavender`). Subtitle "We name the source." in `<span class="block text-[0.36em] mt-6 text-body">`.
+- `<h1>` with serif-it, font-size `clamp(72px, 9vw, 144px)`, line-height 0.96. "Every shot<br/>is a <em>quotation.</em>" The `<em>` is colored via inline style `style={{ color: "var(--grad-lavender)" }}` (committed approach — does not depend on Tailwind v4 `@theme` correctly auto-generating a `text-grad-lavender` utility). If at implementation time the Tailwind utility is verified to work, prefer the utility class; the inline style is the fallback that's guaranteed to render. Subtitle "We name the source." in `<span class="block text-[0.36em] mt-6 text-body">`.
 - `<p class="lede">` with the new copy (full text in index.html line 661–666).
 - `<HeroForm onSubmit={(r) => router.push(\`/report/${r.youtube_id}\`)} />`
 - `<div class="help" style={fontFamily: "var(--serif)", fontStyle: "italic"}>` containing `<span><span class="kbd">⌘ V</span> paste from clipboard</span>` and `<span>YouTube only · 480p · ~90s analysis</span>`.
@@ -231,7 +239,7 @@ const RECENT_QUOTATIONS_DEMO = [
 // TODO(SP6): replace with dynamic GET /api/recent-references when endpoint exists
 ```
 
-Each card is a `<a href="#" onClick={preventDefault}>` for now; SP4 (Reference detail) will wire them to `/reference/{id}`.
+Each card is rendered as `<button type="button" disabled aria-disabled="true" className="cite-card cite-card-disabled">` for now (not an `<a>` to a dead anchor — keeps the focus order accessible by signaling "not yet interactive"). SP4 (Reference detail) will swap these to `<Link href={`/reference/${id}`}>` once the route exists. The `.cite-card-disabled` rule sets `cursor: default` and removes any future hover affordance.
 
 **FooterStrip** — grid 5 columns, border-top `1px solid var(--hairline)`, padding 32px 64px:
 
@@ -254,28 +262,46 @@ Each step:
 
 #### `frontend/components/HeroForm.tsx` (visual rewrite, logic preserved)
 
+Existing exports and indirections **unchanged**:
+- Default export: `function HeroForm({ onSubmit }: { onSubmit: (r: StartAnalysisResponse) => void })`
+- Imports: `startAnalysis` from `@/lib/api` (the indirection that wraps the actual `fetch("/api/decode", ...)` call — do not refactor it inline)
+- State variables retain their existing names: `url`, `busy`, `error`. **No rename of `busy` to `loading`.**
+- Submit handler unchanged: `setBusy(true)` → `await startAnalysis(url)` → `onSubmit(r)` → `setBusy(false)`.
+
 Markup becomes the `.url-form` pattern from `styles.css`:
 
 ```tsx
-<form className="url-form" onSubmit={handleSubmit}>
+<form className="url-form" onSubmit={submit}>
   <span className="pre">paste url →</span>
   <input
+    id="hero-youtube-url"
     type="text"
     placeholder="https://www.youtube.com/watch?v=..."
     value={url}
     onChange={(e) => setUrl(e.target.value)}
-    disabled={loading}
+    required
+    autoComplete="off"
+    disabled={busy}
   />
-  <button type="submit" className="btn btn-primary" disabled={loading || !url}>
-    {loading ? "Decoding…" : <>Decode &nbsp; ↵</>}
+  <button type="submit" className="btn btn-primary" disabled={busy}>
+    <span>{busy ? "Working" : "Decode"}</span>
+    <span aria-hidden>{busy ? null : "↵"}</span>
   </button>
 </form>
-{error && <div className="error">{error}</div>}
+{error && <span role="alert" className="error">⚠ {error}</span>}
 ```
 
-`.url-form` styles to be added in `globals.css`: flex row, `border: 1px solid var(--hairline-strong)`, `border-radius: var(--r-pill)`, `padding: 4px 4px 4px 16px`, `background: var(--canvas-soft)`, with `.url-form .pre` (uppercase muted label), `.url-form input` (transparent, no border, ink color, flex:1), `.url-form button` overrides (already a `.btn-primary`).
+Notes:
+- Button text remains `"Decode"` / `"Working"` (preserves the existing `getByRole("button", { name: /decode/i })` test selector unchanged).
+- The error span retains `role="alert"` (preserves the existing `getByRole("alert")` test).
+- Placeholder remains `"https://www.youtube.com/watch?v=..."` (preserves `getByPlaceholderText(/youtube/i)`).
+- The decorative `↵` glyph and the `Working` text are inside `<span>` so screen readers don't read the glyph as content.
 
-All existing logic intact: `useState` for url/loading/error, `fetch("/api/decode", { method: "POST", body: JSON.stringify({ url }) })`, error handling, calls `onSubmit(result)` on success.
+`.url-form` styles to be added in `globals.css`: flex row, `align-items: center`, `border: 1px solid var(--hairline-strong)`, `border-radius: var(--r-pill)`, `padding: 4px 4px 4px 16px`, `background: var(--canvas-soft)`, with:
+- `.url-form .pre` — `text-transform: uppercase; font-size: 12px; letter-spacing: 0.96px; color: var(--muted)`
+- `.url-form input` — `flex: 1; border: 0; outline: 0; background: transparent; color: var(--ink); padding: 12px 8px; font-size: 16px; font-family: var(--sans)`, with `::placeholder { color: var(--muted-soft) }`
+- `.url-form button.btn-primary` — already styled by `.btn` + `.btn-primary` rules (white pill).
+- `.error` — `color: var(--error); font-size: 12px; text-transform: uppercase; letter-spacing: 0.96px; font-family: var(--sans)`
 
 #### `frontend/tailwind.config.ts` (modify, but keep old tokens)
 
@@ -307,8 +333,8 @@ No new error paths. HeroForm error states (network failure, invalid URL, backend
 
 ## Testing strategy
 
-**Existing tests that must continue passing**:
-- `HeroForm.test.tsx` — logic assertions (submit flow, loading state, error rendering) intact. Any classname-based assertion updated to new classes (`.btn-primary`, `.url-form`).
+**Existing tests that must continue passing — no test code changes required**:
+- `HeroForm.test.tsx` — uses semantic queries: `getByPlaceholderText(/youtube/i)`, `getByRole("button", { name: /decode/i })`, `getByRole("alert")`. The new markup preserves all three (placeholder is `https://www.youtube.com/watch?v=...`, button text is `"Decode"`, error span has `role="alert"`). No assertion needs updating.
 - `PipelineStatus.test.tsx`, `ReferencePanel.test.tsx`, `VideoPlayer.test.tsx` — entirely unchanged (no source change to these components).
 
 **No new tests introduced.** This is a pure visual reskin; the underlying logic is unchanged. Visual changes are verified manually:
@@ -329,7 +355,12 @@ No new error paths. HeroForm error states (network failure, invalid URL, backend
 3. **`color-mix(in oklab, ...)` in `.chip-amber / .chip-cyan`** — fails silently in Safari < 16.4 and Firefox < 113. Fallback rendering = solid border-color and color from non-mixed stops. Acceptable degradation; landing doesn't use chips, so visible only when SP2 brings them in.
 4. **Reduced motion** — `@media (prefers-reduced-motion: reduce) { .orb { animation: none; } }` ensures accessibility compliance.
 5. **Report page visual breakage during SP1** — accepted (decision matrix, choice B). The `body { background: var(--canvas) }` global makes the report look wrong. Mitigation: none. This is the explicit cost of cutover migration; resolved by SP2.
-6. **Mobile slate wrap** — at `<640px`, slate hides all `.tc` elements except date. `<b>ClipDecoder</b>` and version label remain. Docs/GitHub links also hidden.
+6. **Mobile slate wrap** — at `<640px`, slate hides via CSS `display: none`:
+   - The `scene 01 · take 01` `<span class="tc">` element
+   - The `00:00:00:00` `<span class="tc">` element
+   - The "Docs" and "GitHub ↗" `<span>` links
+   - The version line `v0.1 · local-first · NIM`
+   What stays visible: the peach `.dot`, `<b>ClipDecoder</b>`, the date `<span class="tc">` (so the slate retains some informational content). Implemented via `@media (max-width: 639px)` rules in `globals.css` targeting these elements by class + position (e.g., `.slate .tc:not(:nth-of-type(2))` to hide all `.tc` except the date which is the second one rendered).
 7. **JS disabled** — page renders correctly (markup is static). Form submit triggers a default POST that returns JSON; user sees raw response. Not a priority but markup remains semantic.
 8. **EB Garamond CDN failure** — fallback to "GT Sectra", then Times New Roman. Visual character lost but text remains legible.
 
@@ -356,7 +387,7 @@ SP1 is complete when:
 - **Report visual disgrace during SP1 dev cycle** — accepted up front (option B in decision matrix). Mitigation: keep SP1 short (1–2 days) and roll into SP2 quickly so the dev experience isn't degraded for long.
 - **EB Garamond Google Fonts CDN unreliability** — rare; fallback chain handles it. No mitigation needed.
 - **Tailwind v4 `@theme` block edge cases** (Tailwind v4 is in beta) — if `@theme` doesn't generate the expected utilities for `--color-grad-lavender`, fall back to defining colors in `tailwind.config.ts` `theme.extend.colors`. This is a known v4 quirk.
-- **Hidden references to old tokens in components I didn't audit** — e.g., a stray `bg-mist` somewhere. Mitigation: grep `frontend/` for `midnight|lavender|magenta|orange|mist|aurora|bricolage|plex` after the rewrite and ensure all hits are inside the report subtree (acceptable) or the kept-for-now `tailwind.config.ts` (acceptable).
+- **Hidden references to old tokens in components I didn't audit** — e.g., a stray `bg-mist` somewhere. Mitigation: grep `frontend/` for `midnight|lavender|magenta|orange|mist|aurora|bricolage|plex|font-display|font-mono|tracking-mono-label|tracking-display|tracking-body|reveal-child|float-slow|marquee|wordmark` after the rewrite and ensure all hits are inside (a) the report subtree, (b) `tailwind.config.ts` (kept-for-report), or (c) `globals.css` kept-for-report block. No hits should remain in `app/page.tsx`, `app/layout.tsx`, or `components/HeroForm.tsx`.
 
 ## Out of scope
 
