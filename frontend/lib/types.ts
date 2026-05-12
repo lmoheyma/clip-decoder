@@ -14,6 +14,7 @@ export interface VerifiedReference {
   final_confidence: Confidence;
   supporting_elements: string[];
   wikipedia_url: string | null;
+  wikipedia_thumbnail_url?: string | null;
 }
 
 export interface FrameAnalysis {
@@ -21,6 +22,7 @@ export interface FrameAnalysis {
   frame_id: string;
   composition: string;
   palette: string[];
+  palette_hex?: string[];
   camera_move: string;
   costume_setting: string;
   distinctive_features: string[];
@@ -35,6 +37,7 @@ export interface Report {
   duration_s: number;
   references: VerifiedReference[];
   frame_analyses: FrameAnalysis[];
+  created_at?: string;
 }
 
 export type PipelineStep =
