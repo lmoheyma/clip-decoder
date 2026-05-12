@@ -45,13 +45,38 @@ export function subscribePipeline(
   onError?: (err: unknown) => void,
 ): () => void {
   const es = new EventSource(`/api/stream/${encodeURIComponent(youtubeId)}`);
+  // Steps that map to named SSE events emitted by the backend.
   const stepNames: PipelineEvent["step"][] = [
-    "ingest", "shots", "vision", "crossref", "verify", "done", "error",
+    "ingest",
+    "shots",
+    "vision",
+    "vision_frame",
+    "crossref",
+    "crossref_candidate",
+    "verify",
+    "done",
+    "error",
   ];
+  // Deduplication: on EventSource auto-reconnect the backend replays the
+  // full history. Without this Set, every reconnect duplicates log lines
+  // and candidate cards in the UI.
+  const seen = new Set<string>();
+  function eventKey(e: PipelineEvent): string {
+    const p = e.payload as Record<string, unknown>;
+    const id =
+      (p?.frame_id as string | undefined) ??
+      (p?.work_title as string | undefined) ??
+      (p?.source_frame_id as string | undefined) ??
+      e.message;
+    return `${e.step}:${id}:${e.progress}`;
+  }
   for (const step of stepNames) {
     es.addEventListener(step, (raw) => {
       try {
         const data = JSON.parse((raw as MessageEvent).data) as PipelineEvent;
+        const key = eventKey(data);
+        if (seen.has(key)) return;
+        seen.add(key);
         onEvent(data);
         if (data.step === "done" || data.step === "error") es.close();
       } catch (err) {
