@@ -2,7 +2,8 @@ FROM python:3.12-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=300
 
 # System deps for ffmpeg + scenedetect (opencv) + yt-dlp
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -26,7 +27,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # so we can run the unit suite inside the container while source
 # is bind-mounted.
 FROM base AS dev
-RUN uv sync --frozen
+RUN uv sync
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
