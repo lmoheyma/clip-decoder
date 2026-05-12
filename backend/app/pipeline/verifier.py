@@ -36,7 +36,10 @@ class Verifier:
         self._sem = asyncio.Semaphore(concurrency)
         self._template = load_prompt("verifier")
 
-    async def _wiki_url(self, work_title: str) -> str | None:
+    async def _wiki_lookup(
+        self, work_title: str
+    ) -> tuple[str | None, str | None]:
+        """Return (page_url, thumbnail_url). Both None if the article is missing."""
         slug = urllib.parse.quote(work_title.replace(" ", "_"))
         async with httpx.AsyncClient(
             timeout=10.0,
@@ -45,14 +48,16 @@ class Verifier:
             try:
                 r = await http.get(WIKI_SUMMARY_URL.format(slug=slug))
             except httpx.HTTPError:
-                return None
+                return None, None
             if r.status_code != 200:
-                return None
+                return None, None
             data = r.json()
             try:
-                return data["content_urls"]["desktop"]["page"]
+                page_url = data["content_urls"]["desktop"]["page"]
             except (KeyError, TypeError):
-                return None
+                return None, None
+            thumb_url = (data.get("thumbnail") or {}).get("source")
+            return page_url, thumb_url
 
     def _bucket(self, verdict: Verdict, wiki_url: str | None) -> Confidence:
         if verdict is Verdict.REJECT:
@@ -84,8 +89,9 @@ class Verifier:
         verdict = Verdict(str(data.get("verdict", "reject")).lower())
         supporting = [str(x) for x in (data.get("supporting_elements") or [])]
         wiki_url: str | None = None
+        wiki_thumb: str | None = None
         if self._wiki and verdict is not Verdict.REJECT:
-            wiki_url = await self._wiki_url(candidate.work_title)
+            wiki_url, wiki_thumb = await self._wiki_lookup(candidate.work_title)
         bucket = self._bucket(verdict, wiki_url)
         return VerifiedReference(
             **candidate.model_dump(),
@@ -93,6 +99,7 @@ class Verifier:
             final_confidence=bucket,
             supporting_elements=supporting,
             wikipedia_url=wiki_url,
+            wikipedia_thumbnail_url=wiki_thumb,
         )
 
     async def verify(

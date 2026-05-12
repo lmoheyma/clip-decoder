@@ -3,6 +3,7 @@ import asyncio
 from typing import Awaitable, Callable, Iterable
 from app.models import FrameAnalysis, KeyFrame
 from app.nim.client import NimClient
+from app.pipeline.palette import extract_palette_hex
 from app.prompts.loader import load_prompt
 
 
@@ -32,11 +33,13 @@ class FrameAnalyzer:
                 prompt=self._prompt,
                 json_mode=True,
             )
+        palette_hex = extract_palette_hex(kf.frame_path)
         return FrameAnalysis(
             timestamp_s=kf.timestamp_s,
             frame_id=kf.shot_id,
             composition=str(data.get("composition", "")),
             palette=[str(x) for x in (data.get("palette") or [])],
+            palette_hex=palette_hex,
             camera_move=str(data.get("camera_move", "unknown")),
             costume_setting=str(data.get("costume_setting", "")),
             distinctive_features=[

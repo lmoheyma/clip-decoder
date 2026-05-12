@@ -81,3 +81,62 @@ async def test_reject_returns_hidden():
     result = await v.verify(_candidate(), {f.frame_id: f for f in [_fa()]})
     assert result.verdict == Verdict.REJECT
     assert result.final_confidence == Confidence.HIDDEN
+
+
+@respx.mock
+async def test_wikipedia_thumb_parsed_when_present():
+    nim = AsyncMock()
+    nim.complete_text.return_value = {
+        "verdict": "keep",
+        "supporting_elements": ["a", "b", "c"],
+        "final_confidence": 0.9,
+        "rationale": "ok",
+    }
+    respx.get(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/The_Shining"
+    ).mock(
+        return_value=Response(
+            200,
+            json={
+                "content_urls": {
+                    "desktop": {"page": "https://en.wikipedia.org/wiki/The_Shining"}
+                },
+                "thumbnail": {
+                    "source": "https://upload.wikimedia.org/.../200px-shining.jpg",
+                    "width": 200,
+                    "height": 200,
+                },
+            },
+        )
+    )
+    v = Verifier(nim_client=nim, model="m", wikipedia=True)
+    result = await v.verify(_candidate(), {f.frame_id: f for f in [_fa()]})
+    assert result.wikipedia_thumbnail_url == "https://upload.wikimedia.org/.../200px-shining.jpg"
+
+
+@respx.mock
+async def test_wikipedia_thumb_none_when_absent():
+    nim = AsyncMock()
+    nim.complete_text.return_value = {
+        "verdict": "keep",
+        "supporting_elements": ["a", "b", "c"],
+        "final_confidence": 0.9,
+        "rationale": "ok",
+    }
+    respx.get(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/The_Shining"
+    ).mock(
+        return_value=Response(
+            200,
+            json={
+                "content_urls": {
+                    "desktop": {"page": "https://en.wikipedia.org/wiki/The_Shining"}
+                },
+                # no "thumbnail" key
+            },
+        )
+    )
+    v = Verifier(nim_client=nim, model="m", wikipedia=True)
+    result = await v.verify(_candidate(), {f.frame_id: f for f in [_fa()]})
+    assert result.wikipedia_url is not None
+    assert result.wikipedia_thumbnail_url is None

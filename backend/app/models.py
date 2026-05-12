@@ -47,6 +47,7 @@ class FrameAnalysis(BaseModel):
     frame_id: str
     composition: str
     palette: list[str]
+    palette_hex: list[str] = []
     camera_move: str
     costume_setting: str
     distinctive_features: list[str]
@@ -70,6 +71,7 @@ class VerifiedReference(ReferenceCandidate):
     final_confidence: Confidence
     supporting_elements: list[str]
     wikipedia_url: str | None = None
+    wikipedia_thumbnail_url: str | None = None
 
 
 class Report(BaseModel):

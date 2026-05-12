@@ -8,21 +8,44 @@ import {
   subscribePipeline,
 } from "@/lib/api";
 import type {
+  Confidence,
+  FrameAnalysis,
   PipelineEvent,
   Report,
   VerifiedReference,
 } from "@/lib/types";
+import { computeReportStats } from "@/lib/reportStats";
 import { PipelineStatus } from "@/components/PipelineStatus";
 import { VideoPlayer, type VideoPlayerHandle } from "@/components/VideoPlayer";
-import { ReferencePanel } from "@/components/ReferencePanel";
-import { ConfidenceFilter } from "@/components/ConfidenceFilter";
+import { FilterBar } from "@/components/FilterBar";
+import { SummaryCard } from "@/components/SummaryCard";
+import { ReferenceCard } from "@/components/ReferenceCard";
+
+function formatDuration(s: number): string {
+  const t = Math.floor(s);
+  return `${Math.floor(t / 60).toString().padStart(2, "0")}:${(t % 60).toString().padStart(2, "0")}`;
+}
+
+function formatDate(iso: string | undefined): string {
+  if (!iso) return "recently";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "recently";
+  }
+}
 
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>();
   const [report, setReport] = useState<Report | null>(null);
   const [events, setEvents] = useState<PipelineEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [showSpeculative, setShowSpeculative] = useState(false);
+  const [shareToast, setShareToast] = useState(false);
   const playerRef = useRef<VideoPlayerHandle>(null);
 
   useEffect(() => {
@@ -57,163 +80,278 @@ export default function ReportPage() {
     };
   }, [id]);
 
-  function jump(ref: VerifiedReference) {
-    playerRef.current?.seekTo(ref.timestamp_s);
-  }
-  async function flag(idx: number) {
-    await flagReference(id, idx);
-  }
+  const stats = useMemo(
+    () => (report ? computeReportStats(report) : null),
+    [report],
+  );
 
-  const stats = useMemo(() => {
-    if (!report) return null;
-    const confirmed = report.references.filter((r) => r.final_confidence === "confirmed").length;
-    const speculative = report.references.filter((r) => r.final_confidence === "speculative").length;
-    return {
-      confirmed,
-      speculative,
-      shots: report.frame_analyses.length,
-      duration: report.duration_s,
-    };
+  const [selectedVerdicts, setSelectedVerdicts] = useState<Set<Confidence>>(
+    new Set<Confidence>(["confirmed", "speculative"]),
+  );
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+
+  // Initialize selectedTypes once the report loads (one-shot, all types on)
+  useEffect(() => {
+    if (stats && selectedTypes.size === 0 && stats.availableTypes.length > 0) {
+      setSelectedTypes(new Set(stats.availableTypes));
+    }
+  }, [stats, selectedTypes.size]);
+
+  // FrameAnalysis lookup by frame_id for palette joining
+  const frameById = useMemo(() => {
+    const m = new Map<string, FrameAnalysis>();
+    if (report) {
+      for (const f of report.frame_analyses) m.set(f.frame_id, f);
+    }
+    return m;
   }, [report]);
 
+  const filteredRefs = useMemo(() => {
+    if (!report) return [];
+    return report.references
+      .filter((r) => selectedVerdicts.has(r.final_confidence))
+      .filter((r) => selectedTypes.has(r.work_type))
+      .sort((a, b) => a.timestamp_s - b.timestamp_s);
+  }, [report, selectedVerdicts, selectedTypes]);
+
+  function toggleVerdict(v: Confidence) {
+    setSelectedVerdicts((prev) => {
+      const next = new Set(prev);
+      if (next.has(v)) next.delete(v);
+      else next.add(v);
+      return next;
+    });
+  }
+  function toggleType(t: string) {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  }
+
+  function jumpTo(ref: VerifiedReference) {
+    playerRef.current?.seekTo(ref.timestamp_s);
+  }
+  async function handleFlag(idx: number) {
+    await flagReference(id, idx);
+  }
+  async function shareLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShareToast(true);
+      setTimeout(() => setShareToast(false), 2000);
+    } catch {
+      // clipboard unavailable in non-secure context
+    }
+  }
+
+  function Slate({
+    youtubeId,
+    duration,
+    shots,
+    refs,
+  }: {
+    youtubeId: string;
+    duration: number;
+    shots: number;
+    refs: number;
+  }) {
+    return (
+      <div className="slate">
+        <span className="dot" />
+        <b>ClipDecoder</b>
+        <span className="slate-context">Report</span>
+        <span className="sep" />
+        <span className="tc">{youtubeId}</span>
+        <span className="tc">{formatDuration(duration)}</span>
+        <span className="tc">
+          {shots} shots · {refs} references
+        </span>
+        <span className="sep" />
+        <button type="button" className="slate-action" onClick={shareLink}>
+          {shareToast ? "Link copied" : "Share ↗"}
+        </button>
+        <a
+          className="slate-action"
+          href={`/api/report/${id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Raw JSON
+        </a>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (!report && !error) {
+    return (
+      <main className="frame surface-dark relative min-h-screen flex flex-col">
+        <div className="slate">
+          <span className="dot" />
+          <b>ClipDecoder</b>
+          <span className="slate-context">Report</span>
+          <span className="sep" />
+          <span className="tc">{id}</span>
+        </div>
+        <div style={{ padding: "clamp(32px, 5vw, 64px)" }}>
+          <PipelineStatus events={events} />
+        </div>
+      </main>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <main className="frame surface-dark relative min-h-screen flex flex-col">
+        <div className="slate">
+          <span className="dot" />
+          <b>ClipDecoder</b>
+          <span className="slate-context">Report</span>
+          <span className="sep" />
+          <span className="tc">{id}</span>
+        </div>
+        <div
+          style={{ padding: "clamp(32px, 5vw, 64px)", maxWidth: 720 }}
+        >
+          <div
+            className="hairline"
+            style={{ marginBottom: 16, color: "var(--error)" }}
+          >
+            Pipeline error
+          </div>
+          <h1
+            className="serif-it"
+            style={{
+              fontSize: "clamp(28px, 4vw, 48px)",
+              color: "var(--ink)",
+            }}
+            role="alert"
+          >
+            {error}
+          </h1>
+          <Link
+            className="ulink"
+            href="/"
+            style={{ marginTop: 24, display: "inline-block" }}
+          >
+            ← Try another clip
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (!report || !stats) return null;
+
   return (
-    <main className="relative min-h-screen bg-deep-sky text-white overflow-hidden">
-      {/* Decorative aurora glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-40 top-10 w-[640px] h-[640px] rounded-full float-slow"
-        style={{
-          background:
-            "radial-gradient(closest-side, rgba(239,44,193,0.30), rgba(189,187,255,0.18) 50%, transparent 80%)",
-          filter: "blur(36px)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-32 bottom-0 w-[520px] h-[520px] rounded-full float-slow"
-        style={{
-          background:
-            "radial-gradient(closest-side, rgba(252,76,2,0.25), rgba(189,187,255,0.12) 55%, transparent 80%)",
-          filter: "blur(32px)",
-          animationDelay: "-8s",
-        }}
+    <main className="frame surface-dark relative min-h-screen flex flex-col">
+      <Slate
+        youtubeId={report.youtube_id}
+        duration={report.duration_s}
+        shots={stats.shots}
+        refs={stats.total}
       />
 
-      {/* ─── Top nav ─────────────────────────────────────────── */}
-      <nav className="relative z-10 px-8 py-6 flex items-center justify-between border-b border-white/10">
-        <Link href="/" className="flex items-center gap-3 group">
-          <span className="block w-2.5 h-2.5 rounded-full bg-lavender" />
-          <span className="font-mono uppercase text-[11px] tracking-mono-label group-hover:text-lavender transition-colors">
-            ← ClipDecoder
-          </span>
-        </Link>
-        <div className="flex items-center gap-6 font-mono uppercase text-[11px] tracking-mono-label text-white/55">
-          <span>Report // {id}</span>
-          {report && (
-            <ConfidenceFilter
-              showSpeculative={showSpeculative}
-              onToggle={setShowSpeculative}
-            />
+      <header className="report-header">
+        <h1 className="serif-it report-h1">
+          A clip you'd<br />like{" "}
+          <em
+            style={{ color: "var(--grad-lavender)", fontStyle: "italic" }}
+          >
+            decoded.
+          </em>
+        </h1>
+        <h2 className="serif-it report-title">{report.title}</h2>
+        <div className="report-meta">
+          <span>{report.channel}</span>
+          <span>·</span>
+          <span>{formatDuration(report.duration_s)}</span>
+          <span>·</span>
+          <span>{stats.shots} shots</span>
+          <span>·</span>
+          <span>Analysed {formatDate(report.created_at)}</span>
+          {stats.wikiHits > 0 && (
+            <>
+              <span>·</span>
+              <span>
+                Wikipedia verified ({stats.wikiHits}/{stats.total})
+              </span>
+            </>
           )}
         </div>
-      </nav>
+      </header>
 
-      <div className="relative z-10 max-w-[1240px] mx-auto px-8 py-12 reveal">
-        {/* Loading state ─ pipeline status takes the whole page */}
-        {!report && !error && (
-          <div className="reveal-child" style={{ ["--d" as never]: "60ms" }}>
-            <PipelineStatus events={events} />
-          </div>
+      <section className="player-row">
+        <div className="player-container">
+          <VideoPlayer ref={playerRef} youtubeId={report.youtube_id} />
+          <p className="hairline">Click any reference card to seek the player</p>
+        </div>
+        <SummaryCard stats={stats} />
+      </section>
+
+      <FilterBar
+        verdictCounts={{
+          confirmed: stats.confirmed,
+          speculative: stats.speculative,
+          hidden: stats.hidden,
+        }}
+        typeCounts={Object.fromEntries(
+          stats.typeBreakdown.map((t) => [t.type, t.count]),
         )}
+        availableTypes={stats.availableTypes}
+        selectedVerdicts={selectedVerdicts}
+        selectedTypes={selectedTypes}
+        onToggleVerdict={toggleVerdict}
+        onToggleType={toggleType}
+      />
 
-        {error && (
-          <div className="reveal-child glass-dark rounded-comfy p-8 max-w-3xl">
-            <p className="font-mono uppercase text-[11px] tracking-mono-label text-brand-orange mb-3">
-              ⚠ pipeline error
-            </p>
-            <p className="font-display text-[24px] leading-[1.2] tracking-h3" role="alert">
-              {error}
-            </p>
-            <Link
-              href="/"
-              className="mt-6 inline-block font-mono uppercase text-[11px] tracking-mono-label text-lavender underline underline-offset-4"
-            >
-              Try another clip →
-            </Link>
+      <div className="grid">
+        {filteredRefs.length === 0 ? (
+          <div
+            className="hairline"
+            style={{
+              gridColumn: "1/-1",
+              textAlign: "center",
+              padding: 48,
+            }}
+          >
+            All references filtered out. Re-enable a chip above.
           </div>
-        )}
-
-        {/* Result state ─ video on left, references on right */}
-        {report && (
-          <>
-            <header
-              className="reveal-child mb-10"
-              style={{ ["--d" as never]: "60ms" }}
-            >
-              <p className="font-mono uppercase text-[11px] tracking-mono-label text-white/55 mb-4">
-                ⟢ Decoded
-              </p>
-              <h1 className="font-display tracking-display text-[clamp(40px,6vw,72px)] leading-[1] text-balance max-w-[1000px]">
-                {report.title}
-              </h1>
-              <p className="mt-4 font-mono uppercase text-[11px] tracking-mono-label text-white/55">
-                {report.channel} · {Math.floor(report.duration_s / 60)}:
-                {String(Math.floor(report.duration_s % 60)).padStart(2, "0")}
-              </p>
-
-              {stats && (
-                <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Stat value={stats.confirmed} label="confirmed refs" />
-                  <Stat value={stats.speculative} label="speculative refs" />
-                  <Stat value={stats.shots} label="frames analyzed" />
-                  <Stat
-                    value={`${Math.floor(stats.duration / 60)}:${String(Math.floor(stats.duration % 60)).padStart(2, "0")}`}
-                    label="duration"
-                  />
-                </div>
-              )}
-            </header>
-
-            <div
-              className="reveal-child grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8"
-              style={{ ["--d" as never]: "180ms" }}
-            >
-              <div className="flex flex-col gap-4">
-                <VideoPlayer ref={playerRef} youtubeId={report.youtube_id} />
-                <p className="font-mono uppercase text-[10px] tracking-mono-label text-white/45">
-                  Click any reference card to seek the player
-                </p>
-              </div>
-              <ReferencePanel
-                references={report.references}
-                showSpeculative={showSpeculative}
-                onJump={jump}
-                onFlag={flag}
+        ) : (
+          filteredRefs.map((ref) => {
+            const frame = frameById.get(ref.source_frame_id);
+            const paletteHex = frame?.palette_hex ?? [];
+            const paletteDescriptors = frame?.palette ?? [];
+            const idx = report.references.indexOf(ref);
+            return (
+              <ReferenceCard
+                key={`${ref.source_frame_id}-${idx}`}
+                reference={ref}
+                paletteHex={paletteHex}
+                paletteDescriptors={paletteDescriptors}
+                youtubeId={report.youtube_id}
+                onJump={() => jumpTo(ref)}
+                onFlag={() => handleFlag(idx)}
               />
-            </div>
-          </>
+            );
+          })
         )}
       </div>
 
-      {/* Footer wordmark ─ massive */}
-      <footer className="relative z-10 px-8 pt-32 pb-6 mt-20 border-t border-white/10 overflow-hidden">
-        <h2 className="wordmark-foot text-white/20 leading-none">clipdecoder</h2>
-        <div className="flex items-center justify-between mt-6 font-mono uppercase text-[10px] tracking-mono-label text-white/35">
-          <span>© {new Date().getFullYear()} clipdecoder</span>
-          <span>evidence-grounded references · streamed live</span>
-        </div>
+      <footer className="report-footer">
+        <span>Run · {report.youtube_id}</span>
+        <span>
+          Wikipedia hits · {stats.wikiHits} / {stats.total}
+        </span>
+        <span>
+          References · {stats.confirmed} confirmed · {stats.speculative}{" "}
+          speculative · {stats.hidden} hidden
+        </span>
       </footer>
     </main>
-  );
-}
-
-function Stat({ value, label }: { value: number | string; label: string }) {
-  return (
-    <div className="glass-dark rounded-comfy p-4">
-      <div className="font-display tracking-h2 text-[28px] leading-none">{value}</div>
-      <div className="mt-2 font-mono uppercase text-[10px] tracking-mono-label text-white/55">
-        {label}
-      </div>
-    </div>
   );
 }

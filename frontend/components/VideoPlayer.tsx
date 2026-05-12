@@ -42,7 +42,17 @@ export const VideoPlayer = forwardRef<
   }));
 
   return (
-    <div className="aspect-video w-full bg-black rounded-comfy overflow-hidden shadow-midnight">
+    <div
+      className="player"
+      style={{
+        aspectRatio: "16/9",
+        width: "100%",
+        background: "var(--surface-dark)",
+        borderRadius: "var(--r-2)",
+        overflow: "hidden",
+        boxShadow: "var(--shadow-1)",
+      }}
+    >
       {origin && (
         <iframe
           ref={iframeRef}

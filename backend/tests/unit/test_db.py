@@ -49,6 +49,22 @@ async def test_load_missing_returns_none(db: Database):
     assert await db.load_report("nope") is None
 
 
+async def test_load_report_meta_returns_report_and_created_at(
+    db: Database, sample_report: Report
+):
+    from datetime import datetime
+    await db.save_report(sample_report, status=AnalysisStatus.DONE)
+    result = await db.load_report_meta("abc123")
+    assert result is not None
+    report, created_at = result
+    assert report.youtube_id == "abc123"
+    assert isinstance(created_at, datetime)
+
+
+async def test_load_report_meta_returns_none_when_missing(db: Database):
+    assert await db.load_report_meta("nope") is None
+
+
 async def test_status_lifecycle(db: Database, sample_report: Report):
     await db.set_status("abc123", AnalysisStatus.RUNNING)
     assert await db.get_status("abc123") == AnalysisStatus.RUNNING
