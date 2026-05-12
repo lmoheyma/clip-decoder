@@ -1,13 +1,16 @@
 import json
+import shutil
 from pathlib import Path
 from unittest.mock import AsyncMock
 from app.models import KeyFrame
 from app.pipeline.frame_analyzer import FrameAnalyzer
 
+_FIXTURE_JPG = Path(__file__).parent.parent / "fixtures" / "striped.jpg"
+
 
 async def test_analyzes_each_frame(tmp_path: Path):
     img = tmp_path / "shot_00.jpg"
-    img.write_bytes(b"\xff\xd8\xff\xd9")
+    shutil.copy(_FIXTURE_JPG, img)
     keyframes = [
         KeyFrame(shot_id="shot_00", timestamp_s=2.5, frame_path=img),
         KeyFrame(shot_id="shot_01", timestamp_s=8.5, frame_path=img),
@@ -38,7 +41,7 @@ async def test_analyzes_each_frame(tmp_path: Path):
 
 async def test_clamps_confidence_in_observation(tmp_path: Path):
     img = tmp_path / "f.jpg"
-    img.write_bytes(b"x")
+    shutil.copy(_FIXTURE_JPG, img)
     nim = AsyncMock()
     nim.analyze_image.return_value = {
         "composition": "x",
