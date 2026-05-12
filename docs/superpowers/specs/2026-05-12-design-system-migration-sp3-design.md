@@ -448,7 +448,7 @@ SP3 is complete when:
 - ✅ Frontend: `lib/pipelineStats.ts` created with `classifySteps()` + 3 tests.
 - ✅ Frontend: `app/report/[id]/page.tsx` simplified to slim router (~40 lines).
 - ✅ Frontend: `components/report/ReportContent.tsx` extracted from old body.
-- ✅ Frontend: `components/pipeline/` directory created with 8 components (PipelinePage, PipelineSlate, ClipMetadataPane, PipelineList, NowFrame, KeyframeStrip, LogPane, CandidatesPane, PipelineFooterSlate).
+- ✅ Frontend: `components/pipeline/` directory created with 9 components (PipelinePage, PipelineSlate, ClipMetadataPane, PipelineList, NowFrame, KeyframeStrip, LogPane, CandidatesPane, PipelineFooterSlate).
 - ✅ Frontend: `components/PipelineStatus.tsx` + test deleted.
 - ✅ Frontend: 2 new tests on KeyframeStrip pass.
 - ✅ Frontend: `globals.css` extended with SP3 block (~150 lines).
