@@ -51,7 +51,11 @@ class FrameAnalyzer:
             ),
         )
 
-    async def analyze(self, keyframes: Iterable[KeyFrame]) -> list[FrameAnalysis]:
+    async def analyze(
+        self,
+        keyframes: Iterable[KeyFrame],
+        on_frame: Callable[["FrameAnalysis", int, int], Awaitable[None]] | None = None,
+    ) -> list[FrameAnalysis]:
         kfs = list(keyframes)
         results: list[FrameAnalysis] = [None] * len(kfs)  # type: ignore[list-item]
         completed = 0
@@ -61,6 +65,8 @@ class FrameAnalyzer:
             nonlocal completed
             results[i] = await self._one(kf)
             completed += 1
+            if on_frame:
+                await on_frame(results[i], completed, total)
             if self._on_progress:
                 await self._on_progress(completed, total)
 
