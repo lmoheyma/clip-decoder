@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from typing import Iterable
+from typing import Awaitable, Callable, Iterable
 from pydantic import ValidationError
 from app.models import FrameAnalysis, ReferenceCandidate
 from app.nim.client import NimClient
@@ -77,6 +77,7 @@ class RefProposer:
         channel: str,
         lyrics_text: str,
         frame_analyses: list[FrameAnalysis],
+        on_candidate: Callable[[ReferenceCandidate], Awaitable[None]] | None = None,
     ) -> list[ReferenceCandidate]:
         base_ctx = {
             "title": _escape_braces(title or "(unknown)"),
@@ -98,4 +99,8 @@ class RefProposer:
             )
             pass2 = []
 
-        return _merge(pass1, pass2)
+        merged = _merge(pass1, pass2)
+        if on_candidate:
+            for c in merged:
+                await on_candidate(c)
+        return merged
