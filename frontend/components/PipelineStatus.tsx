@@ -31,7 +31,8 @@ function classify(events: PipelineEvent[]): {
 
   const perStep: Record<PipelineStep, Status> = {
     ingest: "queued", shots: "queued", vision: "queued",
-    crossref: "queued", verify: "queued", done: "queued", error: "queued",
+    vision_frame: "queued", crossref: "queued", crossref_candidate: "queued",
+    verify: "queued", done: "queued", error: "queued",
   };
 
   for (const s of STEPS) {
