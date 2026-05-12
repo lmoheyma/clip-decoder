@@ -41,11 +41,52 @@ export interface Report {
 }
 
 export type PipelineStep =
-  | "ingest" | "shots" | "vision" | "crossref" | "verify" | "done" | "error";
+  | "ingest"
+  | "shots"
+  | "vision"
+  | "vision_frame"
+  | "crossref"
+  | "crossref_candidate"
+  | "verify"
+  | "done"
+  | "error";
 
 export interface PipelineEvent {
   step: PipelineStep;
   message: string;
   progress: number;
   payload: Record<string, unknown>;
+}
+
+// Typed payload narrowers — consumers narrow via `event.step` then cast.
+export interface IngestPayload {
+  title: string;
+  channel: string;
+  duration_s: number;
+  captions_count: number;
+}
+
+export interface ShotsPayload {
+  shot_count: number;
+  keyframes: { shot_id: string; timestamp_s: number }[];
+}
+
+export interface VisionFramePayload {
+  frame_id: string;
+  timestamp_s: number;
+  shot_index: number;
+  total_shots: number;
+  raw_description: string;
+  composition: string;
+  palette_hex: string[];
+}
+
+export interface CrossrefCandidatePayload {
+  source_frame_id: string;
+  timestamp_s: number;
+  work_title: string;
+  work_creator: string;
+  work_year: number | null;
+  work_type: string;
+  raw_confidence: number;
 }
