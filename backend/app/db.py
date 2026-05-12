@@ -122,6 +122,16 @@ class Database:
                 return None
             return Report.model_validate(row.report_json)
 
+    async def load_report_meta(
+        self, youtube_id: str
+    ) -> tuple[Report, datetime] | None:
+        """Like load_report but also returns the row's created_at timestamp."""
+        async with self._session() as s:
+            row = await s.get(AnalysisRow, youtube_id)
+            if row is None or row.report_json is None:
+                return None
+            return Report.model_validate(row.report_json), row.created_at
+
     async def flag_reference(
         self, youtube_id: str, ref_index: int, reason: str | None = None
     ) -> None:

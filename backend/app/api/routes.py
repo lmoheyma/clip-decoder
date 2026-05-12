@@ -67,10 +67,14 @@ def build_router(
 
     @router.get("/report/{youtube_id}")
     async def get_report(youtube_id: str) -> dict:
-        report = await db.load_report(youtube_id)
-        if report is None:
+        result = await db.load_report_meta(youtube_id)
+        if result is None:
             raise HTTPException(status_code=404, detail="report not found")
-        return report.model_dump(mode="json")
+        report, created_at = result
+        return {
+            **report.model_dump(mode="json"),
+            "created_at": created_at.isoformat(),
+        }
 
     @router.post("/report/{youtube_id}/flag")
     async def flag(youtube_id: str, body: FlagBody) -> dict[str, str]:
