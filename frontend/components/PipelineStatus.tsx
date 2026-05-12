@@ -46,7 +46,6 @@ function classify(events: PipelineEvent[]): {
     if (perStep[s.key] === "active") { active = s.key; break; }
   }
   if (!active && !finished && !failed) {
-    // Fall back to the first non-done step
     for (const s of STEPS) {
       if (perStep[s.key] !== "done") { active = s.key; break; }
     }
@@ -59,10 +58,25 @@ function StepFill({ step, overall }: { step: Step; overall: number }) {
   const span = step.ceiling - step.floor;
   const local = Math.min(1, Math.max(0, (overall - step.floor) / span));
   return (
-    <div className="relative h-[3px] w-full bg-white/10 rounded-sharp overflow-hidden">
+    <div
+      style={{
+        position: "relative",
+        height: 3,
+        width: "100%",
+        background: "var(--hairline)",
+        borderRadius: "var(--r-pill)",
+        overflow: "hidden",
+      }}
+    >
       <div
-        className="absolute inset-y-0 left-0 fill-aurora"
-        style={{ width: `${local * 100}%`, transition: "width 600ms ease-out" }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          left: 0,
+          width: `${local * 100}%`,
+          background: "var(--grad-peach)",
+          transition: "width 600ms ease-out",
+        }}
       />
     </div>
   );
@@ -74,14 +88,28 @@ export function PipelineStatus({ events }: { events: PipelineEvent[] }) {
   const overallPct = Math.round(overall * 100);
 
   return (
-    <section className="w-full max-w-5xl">
-      {/* Header ────────────────────────────────────────────────── */}
-      <div className="flex items-end justify-between gap-6 mb-8">
+    <section style={{ width: "100%", maxWidth: "64rem" }}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: 24,
+          marginBottom: 32,
+        }}
+      >
         <div>
-          <p className="font-mono uppercase text-[11px] tracking-mono-label text-white/55">
-            Live pipeline · streaming over SSE
-          </p>
-          <h2 className="font-display tracking-h2 text-[40px] leading-[1.05] mt-2">
+          <p className="uc">Live pipeline · streaming over SSE</p>
+          <h2
+            className="serif-it"
+            style={{
+              fontSize: "clamp(28px, 4vw, 40px)",
+              lineHeight: 1.05,
+              marginTop: 8,
+              color: "var(--ink)",
+            }}
+          >
             {failed
               ? "Pipeline halted."
               : finished
@@ -90,17 +118,40 @@ export function PipelineStatus({ events }: { events: PipelineEvent[] }) {
           </h2>
         </div>
 
-        {/* Overall progress radial */}
-        <ProgressRadial pct={overallPct} state={failed ? "error" : finished ? "done" : "active"} />
+        <ProgressRadial
+          pct={overallPct}
+          state={failed ? "error" : finished ? "done" : "active"}
+        />
       </div>
 
-      {/* Step constellation ────────────────────────────────────── */}
-      <div className="relative grid grid-cols-5 gap-3 mb-10">
+      {/* Step constellation */}
+      <div
+        style={{
+          position: "relative",
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gap: 12,
+          marginBottom: 40,
+        }}
+      >
         {/* Connecting line beneath all steps */}
-        <div className="absolute left-0 right-0 top-[14px] h-px bg-white/10" />
         <div
-          className="absolute left-0 top-[14px] h-px fill-aurora"
           style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 14,
+            height: 1,
+            background: "var(--hairline)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 14,
+            height: 1,
+            background: "var(--grad-peach)",
             width: `${Math.min(100, overallPct)}%`,
             transition: "width 700ms ease-out",
           }}
@@ -109,26 +160,42 @@ export function PipelineStatus({ events }: { events: PipelineEvent[] }) {
         {STEPS.map((s) => {
           const status = perStep[s.key];
           const isActive = active === s.key && !finished && !failed;
+          const dotColor =
+            status === "done"
+              ? "var(--grad-lavender)"
+              : status === "active"
+              ? "var(--grad-peach)"
+              : "var(--hairline-strong)";
+          const labelColor =
+            status === "queued" ? "var(--muted-soft)" : "var(--ink)";
+          const statusColor =
+            status === "done"
+              ? "var(--body)"
+              : status === "active"
+              ? "var(--ink)"
+              : "var(--muted-soft)";
           return (
-            <div key={s.key} className="flex flex-col gap-3">
-              <div className="flex items-center gap-2 relative">
+            <div
+              key={s.key}
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span
-                  data-active={status !== "queued"}
-                  className={[
-                    "block w-[10px] h-[10px] rounded-full relative",
-                    status === "done" && "bg-lavender",
-                    status === "active" && "bg-[#ef2cc1] step-glow",
-                    status === "queued" && "bg-white/15",
-                  ].filter(Boolean).join(" ")}
+                  style={{
+                    display: "block",
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: dotColor,
+                    boxShadow: isActive
+                      ? `0 0 12px 2px var(--grad-peach)`
+                      : undefined,
+                  }}
                 />
                 <span
-                  data-active={status !== "queued"}
-                  className={[
-                    "font-mono uppercase text-[11px] tracking-mono-label",
-                    status === "done" && "text-white",
-                    status === "active" && "text-white",
-                    status === "queued" && "text-white/35",
-                  ].filter(Boolean).join(" ")}
+                  className="uc"
+                  data-active={status !== "queued" ? "true" : "false"}
+                  style={{ color: labelColor }}
                 >
                   {s.label}
                 </span>
@@ -137,12 +204,13 @@ export function PipelineStatus({ events }: { events: PipelineEvent[] }) {
               <StepFill step={s} overall={overall} />
 
               <p
-                className={[
-                  "font-mono uppercase text-[10px] tracking-mono-label leading-[1.4] min-h-[28px]",
-                  status === "done" && "text-white/55",
-                  status === "active" && "text-white/85",
-                  status === "queued" && "text-white/25",
-                ].filter(Boolean).join(" ")}
+                className="uc"
+                style={{
+                  fontSize: 10,
+                  color: statusColor,
+                  minHeight: 28,
+                  lineHeight: 1.4,
+                }}
               >
                 {isActive ? "Working…" : status === "done" ? "Done" : "Queued"}
               </p>
@@ -151,28 +219,51 @@ export function PipelineStatus({ events }: { events: PipelineEvent[] }) {
         })}
       </div>
 
-      {/* Live message terminal ─────────────────────────────────── */}
-      <div className="relative glass-dark rounded-comfy p-6 overflow-hidden">
-        {/* Decorative top scan line */}
+      {/* Live message terminal */}
+      <div
+        style={{
+          position: "relative",
+          background: "var(--surface-card)",
+          border: "1px solid var(--hairline)",
+          borderRadius: "var(--r-2)",
+          padding: 24,
+          overflow: "hidden",
+        }}
+      >
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 h-px fill-aurora"
+          style={{
+            position: "absolute",
+            insetInline: 0,
+            top: 0,
+            height: 1,
+            background: "var(--grad-peach)",
+          }}
         />
-        <div className="flex items-baseline justify-between mb-3">
-          <span className="font-mono uppercase text-[10px] tracking-mono-label text-white/45">
-            // last event
-          </span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            marginBottom: 12,
+          }}
+        >
+          <span className="uc">// last event</span>
           {latest && (
-            <span className="font-mono uppercase text-[10px] tracking-mono-label text-white/45">
-              step={latest.step} · progress={(latest.progress * 100).toFixed(0)}%
+            <span className="uc">
+              step={latest.step} · progress=
+              {(latest.progress * 100).toFixed(0)}%
             </span>
           )}
         </div>
         <p
-          className={[
-            "font-display text-[24px] leading-[1.2] tracking-h3 min-h-[32px]",
-            !finished && !failed && "caret",
-          ].filter(Boolean).join(" ")}
+          className="serif-it"
+          style={{
+            fontSize: 22,
+            lineHeight: 1.2,
+            minHeight: 32,
+            color: "var(--ink)",
+          }}
           aria-live="polite"
         >
           {failed
@@ -185,13 +276,46 @@ export function PipelineStatus({ events }: { events: PipelineEvent[] }) {
 
       {/* Event log — prior events only (latest is shown above) */}
       {events.length > 1 && (
-        <ul className="mt-8 grid gap-1 font-mono uppercase text-[10px] tracking-mono-label text-white/40">
+        <ul
+          style={{
+            marginTop: 32,
+            display: "grid",
+            gap: 4,
+            listStyle: "none",
+            padding: 0,
+          }}
+        >
           {events.slice(-7, -1).map((e, i) => (
-            <li key={i} className="flex items-center gap-3">
-              <span className="block w-1 h-1 rounded-full bg-white/30" />
-              <span className="text-white/65">{e.step}</span>
-              <span className="text-white/25">·</span>
-              <span className="truncate">{e.message}</span>
+            <li
+              key={i}
+              className="uc"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                color: "var(--muted-soft)",
+              }}
+            >
+              <span
+                style={{
+                  display: "block",
+                  width: 4,
+                  height: 4,
+                  borderRadius: "50%",
+                  background: "var(--muted)",
+                }}
+              />
+              <span style={{ color: "var(--body)" }}>{e.step}</span>
+              <span style={{ color: "var(--muted-soft)" }}>·</span>
+              <span
+                style={{
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {e.message}
+              </span>
             </li>
           ))}
         </ul>
@@ -200,27 +324,48 @@ export function PipelineStatus({ events }: { events: PipelineEvent[] }) {
   );
 }
 
-function ProgressRadial({ pct, state }: {
+function ProgressRadial({
+  pct,
+  state,
+}: {
   pct: number;
   state: "active" | "done" | "error";
 }) {
   const r = 36;
   const c = 2 * Math.PI * r;
   const dash = (pct / 100) * c;
+  const strokeColor =
+    state === "error"
+      ? "var(--error)"
+      : state === "done"
+      ? "var(--grad-lavender)"
+      : "var(--grad-peach)";
   return (
-    <div className="relative w-[100px] h-[100px] shrink-0">
-      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-        <defs>
-          <linearGradient id="aur" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%"  stopColor="#ef2cc1" />
-            <stop offset="50%" stopColor="#bdbbff" />
-            <stop offset="100%" stopColor="#fc4c02" />
-          </linearGradient>
-        </defs>
-        <circle cx="50" cy="50" r={r} stroke="rgba(255,255,255,0.10)" strokeWidth="6" fill="none" />
+    <div
+      style={{
+        position: "relative",
+        width: 100,
+        height: 100,
+        flexShrink: 0,
+      }}
+    >
+      <svg
+        viewBox="0 0 100 100"
+        style={{ width: "100%", height: "100%", transform: "rotate(-90deg)" }}
+      >
         <circle
-          cx="50" cy="50" r={r}
-          stroke={state === "error" ? "#fc4c02" : "url(#aur)"}
+          cx="50"
+          cy="50"
+          r={r}
+          stroke="var(--hairline)"
+          strokeWidth="6"
+          fill="none"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r={r}
+          stroke={strokeColor}
           strokeWidth="6"
           fill="none"
           strokeLinecap="round"
@@ -228,12 +373,28 @@ function ProgressRadial({ pct, state }: {
           style={{ transition: "stroke-dasharray 700ms ease-out" }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display tracking-h3 text-[22px] leading-none">
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          className="serif-it"
+          style={{ fontSize: 22, lineHeight: 1, color: "var(--ink)" }}
+        >
           {pct}%
         </span>
-        <span className="font-mono uppercase text-[9px] tracking-mono-label text-white/55 mt-1">
-          {state === "error" ? "halted" : state === "done" ? "ready" : "running"}
+        <span className="uc" style={{ marginTop: 4 }}>
+          {state === "error"
+            ? "halted"
+            : state === "done"
+            ? "ready"
+            : "running"}
         </span>
       </div>
     </div>
