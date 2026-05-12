@@ -512,7 +512,7 @@ SP2 is complete when:
 - ✅ `frontend/lib/types.ts` reflects new backend fields.
 - ✅ Tier-3 trivial features: Share button (clipboard) + Raw JSON link both work.
 - ✅ All backend tests pass (existing + new palette/verifier/frames).
-- ✅ All frontend tests pass (existing - ReferencePanel + new FilterBar = net +3 - 4 = net -1 test, all green).
+- ✅ All frontend tests pass: existing tests minus 4 (ReferencePanel.test removed) plus 6 new (3 FilterBar + 3 reportStats) = net +2 frontend; all green.
 - ✅ Manual verification checklist (above) passes end-to-end.
 - ✅ Mobile viewport (≤640px) verified.
 - ✅ Reduced-motion check verified.
@@ -521,7 +521,7 @@ SP2 is complete when:
 ## Risks
 
 - **scikit-learn install** — if absent from `pyproject.toml`, Docker layer rebuild required (~30s). Low risk, easy fix.
-- **DB schema migration** — if FrameAnalysis/VerifiedReference are persisted in structured columns (not a JSON blob), alembic migration needed. Detection deferred to Task 1; mitigation: add a migration task if discovered.
+- **DB schema migration** — confirmed NOT needed. `AnalysisRow.report_json` is a `JSON` column; new Pydantic fields land in the blob. Pydantic defaults handle backward-compatible deserialization of old rows. No alembic work.
 - **Frame jpg cleanup race** — if a future Re-run deletes frames mid-render, browser sees 404 on subsequent loads. Acceptable; SP-polish can add stale-content invalidation.
 - **Wikipedia thumb URL stale** — refs cached in DB may have URLs that 404 after Wikipedia file renames. Mitigation: `onError` hides the thumb. Re-run regenerates fresh URLs.
 - **Large PR scope** — SP2 touches ~10 frontend files + ~4 backend files. Mitigated by fine task decomposition in the implementation plan (12-15 tasks expected).
