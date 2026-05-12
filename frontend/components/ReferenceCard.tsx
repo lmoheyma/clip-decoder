@@ -1,20 +1,42 @@
 "use client";
 import type { VerifiedReference } from "@/lib/types";
 
+function formatTimecode(s: number): string {
+  const t = Math.floor(s);
+  const m = Math.floor(t / 60);
+  const sec = t % 60;
+  return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+}
+
+const VERDICT_META: Record<
+  string,
+  { label: string; icon: string; chipExtra: string; confExtra: string }
+> = {
+  confirmed: { label: "CONFIRMED", icon: "●", chipExtra: "", confExtra: "" },
+  speculative: { label: "SPECULATIVE", icon: "◌", chipExtra: "chip-cyan", confExtra: "conf-cyan" },
+  hidden: { label: "HIDDEN", icon: "✕", chipExtra: "chip-dim", confExtra: "conf-rose" },
+};
+
 export function ReferenceCard({
   reference,
+  paletteHex,
+  paletteDescriptors,
+  youtubeId,
   onJump,
   onFlag,
 }: {
   reference: VerifiedReference;
+  paletteHex: string[];
+  paletteDescriptors: string[];
+  youtubeId: string;
   onJump: () => void;
   onFlag: () => void;
 }) {
-  const ts = Math.floor(reference.timestamp_s);
-  const min = Math.floor(ts / 60);
-  const sec = ts % 60;
-  const isConfirmed = reference.final_confidence === "confirmed";
-  const conf = Math.round(reference.raw_confidence * 100);
+  const verdict = reference.final_confidence;
+  const meta = VERDICT_META[verdict];
+  const tc = formatTimecode(reference.timestamp_s);
+  const isHidden = verdict === "hidden";
+  const confPercent = Math.round(reference.raw_confidence * 100);
 
   function handleKey(e: React.KeyboardEvent<HTMLElement>) {
     if (e.key === "Enter" || e.key === " ") {
@@ -25,97 +47,137 @@ export function ReferenceCard({
 
   return (
     <article
+      className={`ref ref-${verdict}`}
       role="button"
       tabIndex={0}
       onClick={onJump}
       onKeyDown={handleKey}
-      aria-label={`Jump to ${reference.work_title} at ${min}:${sec.toString().padStart(2, "0")}`}
-      className="group relative rounded-comfy bg-white/[0.03] border border-white/10 p-5 flex flex-col gap-3 cursor-pointer transition-all hover:bg-white/[0.06] hover:border-white/20 hover:shadow-aurora focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender/60"
+      aria-label={`Reference: ${reference.work_title} at ${tc}`}
     >
-      <header className="flex items-center justify-between gap-2">
-        <span className="font-mono uppercase text-[10px] tracking-mono-label text-white/55 inline-flex items-center gap-2">
-          <span className="block w-1 h-1 rounded-full bg-lavender" />
-          {min}:{sec.toString().padStart(2, "0")}
-        </span>
-        <span
-          className={[
-            "font-mono uppercase text-[9px] tracking-mono-label px-2 py-1 rounded-sharp border",
-            isConfirmed
-              ? "border-lavender/60 text-lavender bg-lavender/5"
-              : "border-white/15 text-white/55 bg-white/5",
-          ].join(" ")}
+      <div className="ref-left">
+        <div
+          className="thumb"
+          style={{
+            backgroundImage: `url(/api/frames/${youtubeId}/${reference.source_frame_id})`,
+            filter: isHidden ? "grayscale(0.7) brightness(0.6)" : undefined,
+          }}
         >
-          {reference.final_confidence}
-        </span>
-      </header>
-
-      <h3 className="font-display text-[22px] tracking-h3 leading-[1.1] group-hover:text-lavender transition-colors">
-        {reference.work_title}
-      </h3>
-
-      <p className="font-mono uppercase text-[10px] tracking-mono-label text-white/55">
-        {reference.work_creator}
-        {reference.work_year ? ` · ${reference.work_year}` : ""}
-        {" · "}
-        {reference.work_type}
-      </p>
-
-      <p className="text-[14px] leading-[1.45] text-white/75 tracking-body">
-        {reference.reasoning}
-      </p>
-
-      {/* Raw-confidence micro-bar */}
-      <div className="flex items-center gap-2 pt-1">
-        <span className="font-mono uppercase text-[9px] tracking-mono-label text-white/40">
-          conf
-        </span>
-        <div className="flex-1 h-[2px] bg-white/10 rounded-sharp overflow-hidden">
-          <div
-            className="h-full fill-aurora"
-            style={{ width: `${conf}%` }}
-          />
+          <span className="tc-overlay">
+            {tc} · {reference.source_frame_id.toUpperCase()}
+          </span>
         </div>
-        <span className="font-mono uppercase text-[9px] tracking-mono-label text-white/55 w-8 text-right">
-          {conf}%
-        </span>
+        {paletteHex.length > 0 && (
+          <>
+            <div
+              className="palette"
+              style={{ marginTop: 8, opacity: isHidden ? 0.4 : 1 }}
+            >
+              {paletteHex.map((hex, i) => (
+                <span key={i} style={{ background: hex }} />
+              ))}
+            </div>
+            {paletteDescriptors.length > 0 && (
+              <div className="hairline palette-label">
+                PALETTE · {paletteDescriptors.join(" → ").toUpperCase()}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {reference.supporting_elements.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5 pt-1">
-          {reference.supporting_elements.map((el, i) => (
-            <li
-              key={i}
-              className="font-mono uppercase text-[9px] tracking-mono-label px-2 py-1 rounded-sharp border border-white/10 text-white/60 bg-white/[0.02]"
-            >
-              {el}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <footer className="flex justify-between items-center pt-2 border-t border-white/8">
-        {reference.wikipedia_url ? (
-          <a
-            href={reference.wikipedia_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="font-mono uppercase text-[10px] tracking-mono-label text-lavender inline-flex items-center gap-1.5 hover:underline underline-offset-4 cursor-pointer"
-          >
-            Wikipedia <span aria-hidden>↗</span>
-          </a>
-        ) : (
-          <span className="font-mono uppercase text-[10px] tracking-mono-label text-white/30">
-            no external link
+      <div className="ref-right">
+        <div className="ref-verdict-line">
+          <span className={`verdict-marker verdict-${verdict}`}>
+            {meta.icon} {meta.label}
           </span>
+          <span>·</span>
+          <span>{reference.work_type}</span>
+          {reference.wikipedia_url && (
+            <>
+              <span>·</span>
+              <span>Wikipedia verified</span>
+            </>
+          )}
+        </div>
+
+        <div className="ref-title-row">
+          <h3
+            className={`serif-it ref-title ${isHidden ? "ref-title-rejected" : ""}`}
+          >
+            <em>{reference.work_title}</em>
+          </h3>
+          {reference.wikipedia_thumbnail_url && (
+            <img
+              src={reference.wikipedia_thumbnail_url}
+              alt=""
+              className="wiki-thumb"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          )}
+        </div>
+
+        <div className="ref-meta">
+          {reference.work_creator} · {reference.work_year ?? "—"} ·{" "}
+          {reference.work_type}
+        </div>
+
+        <p className="ref-reasoning">{reference.reasoning}</p>
+
+        {reference.supporting_elements.length > 0 && (
+          <div className="ev">
+            {reference.supporting_elements.map((el, i) => (
+              <span key={i} className={`chip ${meta.chipExtra}`}>
+                {el}
+              </span>
+            ))}
+          </div>
         )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onFlag(); }}
-          className="font-mono uppercase text-[10px] tracking-mono-label text-white/55 hover:text-[#fc4c02] transition-colors cursor-pointer"
-        >
-          ✕ Not convinced
-        </button>
-      </footer>
+
+        <div className={`conf ${meta.confExtra}`}>
+          <span>CONFIDENCE</span>
+          <span className="bar">
+            <i style={{ width: `${confPercent}%` }} />
+          </span>
+          <span>{reference.raw_confidence.toFixed(2)}</span>
+        </div>
+
+        <div className="ref-actions">
+          <a
+            className="ulink"
+            onClick={(e) => {
+              e.stopPropagation();
+              onJump();
+            }}
+          >
+            ▸ JUMP TO {tc}
+          </a>
+          {reference.wikipedia_url && (
+            <a
+              className="ulink"
+              href={reference.wikipedia_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              WIKIPEDIA ↗
+            </a>
+          )}
+          {!isHidden && (
+            <a
+              className="ulink ulink-muted"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFlag();
+              }}
+            >
+              NOT CONVINCED ✕
+            </a>
+          )}
+        </div>
+      </div>
     </article>
   );
 }
