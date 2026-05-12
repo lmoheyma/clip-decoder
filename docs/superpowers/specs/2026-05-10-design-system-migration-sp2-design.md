@@ -54,12 +54,15 @@ palette_hex: list[str] = []  # NEW: 5 hex codes like ["#1c1c1c", "#3a4a6b", ...]
 
 # In VerifiedReference
 wikipedia_thumbnail_url: str | None = None  # NEW
-
-# In Report
-created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  # NEW
 ```
 
-Defaults make old persisted runs load gracefully — frontend will detect empty `palette_hex` and `None` thumbnails and render skipping.
+**Note on `created_at`:** `AnalysisRow` in `backend/app/db.py` (line 35) **already** has a `created_at` column that records when the run row was first written. We do NOT add `created_at` to the Pydantic `Report` model (would duplicate state and risk drift with the persisted JSON blob).
+
+Instead, the `/api/report/{youtube_id}` endpoint reads the row's `created_at` and injects it into the response payload. The current endpoint returns just `report_json` (line ~123 of `db.py`); we extend the route handler in `backend/app/api/routes.py` to merge in the row's `created_at` (e.g., `{**report.model_dump(), "created_at": row.created_at.isoformat()}`). Frontend types receive `created_at: string` (ISO 8601). This keeps the DB row the single source of truth and avoids a Pydantic + Pydantic-JSON double-write.
+
+Defaults (`[]`, `None`) on Pydantic make old persisted runs load gracefully — frontend will detect empty `palette_hex` and `None` thumbnails and render skipping.
+
+**No alembic migration needed.** `report_json` is a `JSON` column in `AnalysisRow` (db.py line 33). Adding fields to the Pydantic models simply changes the shape of the JSON blob; old rows still deserialize because Pydantic applies the new defaults at load time.
 
 #### `backend/app/pipeline/palette.py` (NEW — ~30 lines)
 
@@ -87,16 +90,39 @@ def _rgb_to_hex(rgb) -> str:
     return "#" + "".join(f"{c:02x}" for c in rgb)
 ```
 
-Dependencies: `scikit-learn` (verify in `pyproject.toml`; add if missing — risk noted), `Pillow` (already used by shot_sampler), `numpy` (transitive via `scikit-learn`).
+Dependencies (verified absent from `backend/pyproject.toml` — all three are NEW additions in SP2):
+- `Pillow` (image decode/downsample) — **add explicitly**, NOT currently a backend dependency. `shot_sampler.py` uses `ffmpeg`, not PIL.
+- `numpy` (pixel arrays) — **add explicitly**. Transitively present via `scenedetect[opencv]` but should not rely on transitive deps.
+- `scikit-learn` (KMeans clustering) — **add explicitly**.
+
+Add to `[project.dependencies]` in `pyproject.toml`:
+```toml
+"Pillow>=10.0",
+"numpy>=1.26",
+"scikit-learn>=1.4",
+```
+Docker layer rebuild required after the change (~30s for the install layer cache miss).
 
 Tests (`backend/tests/unit/test_palette.py`):
 1. `test_extract_palette_returns_5_hex_strings` — fixture JPG → asserts `len == 5` and each entry matches `^#[0-9a-f]{6}$`
 2. `test_extract_palette_deterministic` — same input twice → same output (random_state=42)
 3. `test_extract_palette_solid_color` — synthetic all-red image → all 5 hex within tolerance of `#ff0000`
 
-#### `backend/app/pipeline/shot_sampler.py` (modify)
+#### `backend/app/pipeline/frame_analyzer.py` (modify — NOT shot_sampler.py)
 
-After writing each keyframe jpg, call `extract_palette_hex(frame_path)` and attach to the `FrameAnalysis` produced for that frame. ~5 lines added.
+`FrameAnalysis` is constructed in `frame_analyzer.py:35` inside `_one(keyframe)`. `shot_sampler.py` produces `KeyFrame` only — it has no knowledge of `FrameAnalysis`. The palette extraction must hook into `frame_analyzer._one`:
+
+```python
+# In FrameAnalyzer._one(), after building the FrameAnalysis fields and before return:
+from app.pipeline.palette import extract_palette_hex
+palette_hex = extract_palette_hex(kf.frame_path)
+return FrameAnalysis(
+    ...existing fields...,
+    palette_hex=palette_hex,
+)
+```
+
+~3 lines added (import + call + field assignment). The keyframe file is already on disk at the point `_one` is called (shot_sampler wrote it), so no ordering issue.
 
 #### `backend/app/pipeline/verifier.py` (modify)
 
@@ -106,26 +132,28 @@ Tests (extend existing `test_verifier.py`):
 1. `test_wikipedia_thumb_parsed_when_present` — mock response with `thumbnail.source` → field populated
 2. `test_wikipedia_thumb_none_when_absent` — mock response without `thumbnail` → field stays `None`
 
-#### `backend/app/api/...` (frame serving endpoint)
+#### `backend/app/api/routes.py` (frame serving endpoint)
 
-Add `GET /api/frames/{youtube_id}/{frame_id}` returning the JPEG with cache headers. Locate the current router file (`backend/app/api/runs.py` or `main.py`) — verify at Task 1.
+Add a new route handler. The router is declared with `APIRouter(prefix="/api")` (routes.py:38), so the decorator path uses just `/frames/...` (the `/api` prefix is applied automatically by FastAPI).
+
+The frames directory base path comes from `app.settings` (the codebase convention; see how other paths are constructed). At time of writing the run output root is configured in `settings`; verify the actual attribute name at implementation time (likely `settings.runs_dir` or similar).
 
 ```python
 import re
-from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 from fastapi.responses import FileResponse
+from app.settings import settings  # whichever import the rest of routes.py uses
 
 _YOUTUBE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
 _FRAME_ID_RE = re.compile(r"^shot_\d+$")
 
-@router.get("/api/frames/{youtube_id}/{frame_id}")
+@router.get("/frames/{youtube_id}/{frame_id}")
 def get_frame(youtube_id: str, frame_id: str):
     if not _YOUTUBE_ID_RE.fullmatch(youtube_id):
         raise HTTPException(400, "invalid youtube_id format")
     if not _FRAME_ID_RE.fullmatch(frame_id):
         raise HTTPException(400, "invalid frame_id format")
-    path = Path("data/runs") / youtube_id / "frames" / f"{frame_id}.jpg"
+    path = settings.runs_dir / youtube_id / "frames" / f"{frame_id}.jpg"
     if not path.exists():
         raise HTTPException(404, "frame not found")
     return FileResponse(
@@ -134,6 +162,22 @@ def get_frame(youtube_id: str, frame_id: str):
         headers={"Cache-Control": "public, max-age=31536000, immutable"},
     )
 ```
+
+External URL after FastAPI assembles the prefix: `GET /api/frames/{youtube_id}/{frame_id}`. Frontend uses this path.
+
+Also extend the existing `GET /api/report/{youtube_id}` handler to merge in `row.created_at`:
+
+```python
+@router.get("/report/{youtube_id}")
+async def get_report(youtube_id: str):
+    row = await db.get_row(youtube_id)        # whatever the existing call is
+    if not row or not row.report_json:
+        raise HTTPException(404, "report not found")
+    report = Report.model_validate(row.report_json)
+    return {**report.model_dump(), "created_at": row.created_at.isoformat()}
+```
+
+(The exact shape depends on what the current handler returns; the key change is adding `created_at` from the row to the response.)
 
 Tests (`backend/tests/integration/test_frames_endpoint.py`):
 1. `test_get_frame_returns_200_with_correct_mime` — fixture frame on disk → 200 + content-type image/jpeg
@@ -165,11 +209,13 @@ Error state shows serif title + hairline body + link to landing.
 
 State at this level: `report`, `events`, `error`, `selectedVerdicts: Set<Confidence>`, `selectedTypes: Set<string>`. Default `selectedVerdicts = new Set(["confirmed", "speculative"])`, `selectedTypes = new Set(derivedTypesFromReport)`.
 
-Derived data (memoized):
+Derived data (memoized in `ReportPage` via `useMemo`):
 - `stats` — `{confirmed, speculative, hidden, shots, duration, wikiHits, minYear, maxYear, typeBreakdown}`
 - `availableTypes` — `Array.from(new Set(report.references.map(r => r.work_type)))`
-- `filteredReferences` — refs where `selectedVerdicts.has(r.final_confidence) && selectedTypes.has(r.work_type)`, sorted by `timestamp_s` ascending
-- `enrichedReferences` — each ref joined with its source `FrameAnalysis` for `palette_hex` + `palette` (descriptors)
+- `filteredReferences` — refs included if and only if **(a)** their `final_confidence` ∈ `selectedVerdicts` AND **(b)** their `work_type` ∈ `selectedTypes`. Filtering is AND between the two axes (verdict and type), OR within each axis (union of selected verdict states; union of selected work_types). Sorted by `timestamp_s` ascending.
+- `enrichedReferences` — each ref joined with its source `FrameAnalysis` for `palette_hex` + `palette` (descriptors).
+
+**Recommendation**: extract `stats` derivation into `frontend/lib/reportStats.ts` (pure function `computeReportStats(report) -> Stats`) so it's independently testable and `ReportPage` stays focused on view assembly. Add `frontend/lib/reportStats.test.ts` with 3-4 tests covering empty refs, no years, mixed verdicts.
 
 ##### `frontend/components/ReferenceCard.tsx` (rewrite — ~121 → ~190 lines)
 
@@ -336,7 +382,7 @@ async function shareLink() {
 }
 ```
 
-**Raw JSON link** (~1 line): `<a href={\`/api/runs/${id}.json\`} target="_blank" rel="noopener">Raw JSON</a>` — relies on the existing `/api/runs/{id}.json` endpoint (verify exists; should — that's how the report data is loaded).
+**Raw JSON link** (~1 line): `<a href={\`/api/report/${id}\`} target="_blank" rel="noopener">Raw JSON</a>` — uses the existing `GET /api/report/{youtube_id}` endpoint (the one extended above to include `created_at`). FastAPI returns JSON content-type by default for dict responses; the browser will pretty-print or download depending on the user's configuration. No file-extension suffix needed.
 
 ### Files unchanged
 
@@ -393,10 +439,13 @@ No new data flow patterns. All filtering/sorting is client-side memoized derivat
 **Frontend**
 
 - `frontend/components/FilterBar.test.tsx` (NEW) — 3 tests
+- `frontend/lib/reportStats.test.ts` (NEW) — 3-4 tests for stats derivation (empty refs, no years, mixed verdicts, type breakdown)
 - `frontend/components/ReferencePanel.test.tsx` (DELETE) — component goes away
 - `frontend/components/HeroForm.test.tsx`, `VideoPlayer.test.tsx`, `PipelineStatus.test.tsx` — unchanged (still pass)
 
-No new tests for `ReferenceCard` (visual reskin, no testable logic), `SummaryCard` (pure derivation), or `ReportPage` (integration covered by manual verification + existing API tests).
+No new tests for `ReferenceCard` (visual reskin, no testable logic), `SummaryCard` (consumes Stats input — covered by `reportStats.test.ts`), or `ReportPage` (integration covered by manual verification).
+
+**Net test delta:** backend +8 (3 palette, 2 verifier extension, 3 frames endpoint); frontend +6 -4 = +2 (3 FilterBar new, 3-4 reportStats new, 4 ReferencePanel removed).
 
 **Manual verification** (final task in plan):
 
@@ -435,7 +484,7 @@ No new tests for `ReferenceCard` (visual reskin, no testable logic), `SummaryCar
 
 11. **scikit-learn missing in pyproject.toml** — verify at Task 1; add if absent; Docker rebuild required (~30s layer).
 
-12. **DB migration for new columns** — if SQLAlchemy persists FrameAnalysis/VerifiedReference structurally (vs JSON column), alembic migration needed for `palette_hex`, `wikipedia_thumbnail_url`, `created_at`. Verify schema at Task 1; add migration task if needed.
+12. **DB migration for new columns** — NOT NEEDED. `AnalysisRow.report_json` is a `JSON` column (`backend/app/db.py:33`). Pydantic-Report fields land in the blob; old rows deserialize via Pydantic defaults at load time. No alembic work.
 
 13. **Mobile viewport** — all responsive rules verified in manual checklist Step 9.
 
@@ -445,11 +494,13 @@ No new tests for `ReferenceCard` (visual reskin, no testable logic), `SummaryCar
 
 SP2 is complete when:
 
-- ✅ `backend/app/models.py` extended with `FrameAnalysis.palette_hex`, `VerifiedReference.wikipedia_thumbnail_url`, `Report.created_at` (all with safe defaults).
+- ✅ `backend/app/models.py` extended with `FrameAnalysis.palette_hex: list[str] = []` and `VerifiedReference.wikipedia_thumbnail_url: str | None = None`. NOT modified: `Report` (created_at stays on `AnalysisRow`, merged into endpoint response).
+- ✅ `backend/pyproject.toml` updated with `Pillow>=10.0`, `numpy>=1.26`, `scikit-learn>=1.4`; Docker layer rebuild verified.
 - ✅ `backend/app/pipeline/palette.py` created with `extract_palette_hex()` + 3 passing tests.
-- ✅ `backend/app/pipeline/shot_sampler.py` integrates the palette extraction; `FrameAnalysis.palette_hex` populated end-to-end.
+- ✅ `backend/app/pipeline/frame_analyzer.py` (NOT shot_sampler.py) calls `extract_palette_hex(kf.frame_path)` in `_one()` and assigns to `FrameAnalysis.palette_hex`.
 - ✅ `backend/app/pipeline/verifier.py` parses Wikipedia thumbnail URL; `VerifiedReference.wikipedia_thumbnail_url` populated; +2 tests.
-- ✅ `GET /api/frames/{youtube_id}/{frame_id}` endpoint live with regex validation + Cache-Control + 3 tests.
+- ✅ `GET /api/frames/{youtube_id}/{frame_id}` endpoint live (registered as `@router.get("/frames/...")` since router has `prefix="/api"`), uses `settings.runs_dir` for base path, regex validation on both path params, Cache-Control immutable, 3 passing tests.
+- ✅ `GET /api/report/{youtube_id}` handler extended to merge `row.created_at` into the JSON response.
 - ✅ `frontend/app/report/[id]/page.tsx` rewritten: Slate, Header, PlayerRow, FilterBar, ReferenceGrid, Footer.
 - ✅ `frontend/components/ReferenceCard.tsx` rewritten per spec markup.
 - ✅ `frontend/components/FilterBar.tsx` created + 3 passing tests.
