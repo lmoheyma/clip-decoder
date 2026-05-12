@@ -71,7 +71,12 @@ await self._emit(
     },
 )
 
-# Vision pass with per-frame callback:
+# Vision pass with per-frame callback.
+# Note: `index` is 1-based for human display ("frame 34 of 62"). `fa.frame_id`
+# remains the 0-padded zero-indexed string from shot_sampler (`f"shot_{i:02d}"`),
+# so frame_id="shot_03" corresponds to shot_index=4. Frontend uses frame_id for
+# set membership (KeyframeStrip.analyzedIds) and shot_index/total_shots for the
+# display label.
 async def _on_vision_frame(fa: FrameAnalysis, index: int, total: int) -> None:
     msg = fa.raw_description[:80] + ("…" if len(fa.raw_description) > 80 else "")
     await self._emit(
@@ -166,11 +171,12 @@ Test (`backend/tests/unit/test_frame_analyzer.py`, extend):
 
 #### `backend/app/pipeline/ref_proposer.py` (modify)
 
-Add optional `on_candidate` parameter to `propose()`. Callback fires for each merged candidate after pass1+pass2 dedup:
+Add optional `on_candidate` parameter to `propose()`. Existing signature is keyword-only (`*`) — keep that convention:
 
 ```python
 async def propose(
     self,
+    *,
     title: str,
     channel: str,
     lyrics_text: str,
@@ -184,6 +190,8 @@ async def propose(
             await on_candidate(c)
     return merged
 ```
+
+The `*` separator preserves call-site compatibility (orchestrator and tests use keyword args).
 
 Test (`backend/tests/unit/test_ref_proposer.py`, extend):
 - `test_on_candidate_callback_called_for_each_merged_candidate` — pass mock, assert called N times with each merged candidate.
@@ -256,13 +264,27 @@ Reduced to ~40 lines: load attempt + SSE subscribe + render either `PipelinePage
 
 #### `frontend/components/report/ReportContent.tsx` (NEW — extract)
 
-Extract the current `app/report/[id]/page.tsx` body (Slate + Header + PlayerRow + FilterBar + Grid + Footer) into a standalone component with prop `{ report: Report; youtubeId: string }`. No behavior change — pure refactor.
+Extract the current `app/report/[id]/page.tsx` body (Slate + Header + PlayerRow + FilterBar + Grid + Footer) into a standalone component with prop `{ report: Report; youtubeId: string }`. No behavior change.
 
-#### `frontend/components/pipeline/` (NEW directory, 8 components)
+**Refactor risk note**: the current SP2 page is ~358 lines with multiple `useState` / `useEffect` / `useMemo` hooks, an inline `Slate` closure that captures `id` + `shareLink` + `shareToast`, and event handlers. "Pure refactor" requires moving 7+ pieces of state and the nested `Slate` component out of the closure.
+
+**Implementation plan should split this into two atomic tasks**:
+1. Extract `ReportContent` from `page.tsx`, keeping all SP2 tests green and the existing route working unchanged. No new behavior — just code movement.
+2. Introduce `PipelinePage` switch in `page.tsx`. Now the page can render either `<ReportContent/>` (post-SP2 behavior) or `<PipelinePage/>` (new SP3 component).
+
+This keeps each diff atomic and verifiable.
+
+#### `frontend/components/pipeline/` and `frontend/components/report/` (NEW subdirectories)
+
+**Directory organization note**: existing `components/` is flat (HeroForm, FilterBar, VideoPlayer, etc.). SP3 introduces two subdirectories (`pipeline/`, `report/`) for the new feature groups. This creates a mixed structure (some files in `components/`, others in `components/pipeline|report/`). Accept this as the start of a directory migration — future SP-polish can reorganize existing flat components if desired. For SP3, do not move any existing components into subdirectories (out of scope).
+
+#### `frontend/components/pipeline/` (NEW directory, 9 components)
 
 1. **`PipelinePage.tsx`** — top-level. Container holding the slate, the 3-column stage, and the footer slate. Reads `events: PipelineEvent[]`, derives all state via `useMemo`, passes typed slices to children.
 
 2. **`PipelineSlate.tsx`** — top bar: `[dot] ClipDecoder analysing · do not close tab — clip · {id} elapsed {hh:mm:ss}`. No Cancel link (Tier 5 deferred).
+
+   **Slate duplication note**: SP1 landing has a `Slate` inline in `app/page.tsx`. SP2 report has another inline `Slate` in `app/report/[id]/page.tsx`. Now SP3 adds `PipelineSlate.tsx`. Three variants with different right-side content. The implementer should decide between (a) keeping all three inline/separate (current path, accept some duplication), or (b) extracting a shared `<Slate>` primitive that takes children via slots. Either is acceptable — note the choice in the implementation. Recommendation: defer the shared extraction to a future SP-polish; for SP3 just write a clean `PipelineSlate` that doesn't need to know about the other two.
 
 3. **`ClipMetadataPane.tsx`** — left col upper. dl of YouTube ID (mono) / Title (serif) / Channel · Duration / Captions count. Empty-state if `clipMeta === null` (ingest event not yet received).
 
@@ -367,7 +389,7 @@ State derivation (all `useMemo` in `PipelinePage`):
 2. **Vision events arrive out of order** — components use `shot_index` from payload (KeyframeStrip), or "latest received" semantics (NowFrame, LogPane). No ordering assumption.
 3. **`crossref_candidate` events arrive in burst** (~1s after merge) — CSS staggered fade-in compensates for the burst, gives "candidates surfacing" feel.
 4. **`vision_frame` events arrive in batches** (concurrency=4) — React batches state updates; LogPane auto-scrolls on final batch, no jank.
-5. **Captions count = 0** — ClipMetadataPane shows "Captions: none".
+5. **Captions count = 0** — ClipMetadataPane shows "Captions: none". **Note**: `ingestor._captions_from_info` currently returns `[]` (yt-dlp captions disabled to avoid 429s). So `captions_count` will be **0 for every run** until captions are wired up in a future SP. The field is forward-looking — adding it to the payload now means the UI is ready without a backend change later.
 6. **Long `raw_description`** — truncated to 80 chars + "…" backend-side, no further truncation needed.
 7. **Mobile viewport (≤900px)** — `.pipeline-stage` collapses to single column. Vertical scroll.
 8. **Reduced motion** — scan animation + fade-in disabled via `@media (prefers-reduced-motion: reduce)`.
@@ -398,7 +420,7 @@ State derivation (all `useMemo` in `PipelinePage`):
   - `marks_analyzed_when_frame_id_in_set`
 - `frontend/components/PipelineStatus.test.tsx` (DELETE) — component removed.
 
-**Net test delta**: backend +5, frontend +5 -2 = +3 frontend.
+**Net test delta**: backend +5, frontend +5 -1 = +4 frontend (deleting only `PipelineStatus.test.tsx`, 1 file).
 
 **Manual verification**:
 1. Launch fresh analysis → redirect to `/report/{id}` → PipelinePage renders within 1s.
@@ -438,7 +460,7 @@ SP3 is complete when:
 ## Risks
 
 - **EventBus replay pace** — with ~100 events per run × 0.18s pace = 18s replay. Bad UX for reload-mid-pipeline. Mitigation: implementer tunes `_REPLAY_PACE_S` adaptively in Task 1 (e.g., 0.04s for `vision_frame` / `crossref_candidate`, 0.18s for transitions; or universal 0.04s).
-- **SSE reconnect duplication** — EventSource native reconnect may redispatch all events from `_history`. Could create duplicates in the frontend log. Mitigation: dedup by `(step, payload.frame_id)` or `(step, message, progress)` hash in the frontend. Implementer audits in Task 1.
+- **SSE reconnect duplication — REQUIRED FIX, not optional** — `frontend/lib/api.ts:subscribePipeline` currently does **zero deduplication**: every SSE message is appended to React state. EventSource auto-reconnect (on connection drop) will redispatch the full `_history` backlog, producing duplicate log lines / duplicate candidate cards on the frontend. **The implementation plan MUST include an explicit task** to add dedup. Recommended approach: hash-based dedup keyed on `(step, payload.frame_id ?? message ?? Math.random())` stored in a `useRef<Set<string>>`. Frontend filters duplicate events before pushing to the `events` state array.
 - **80-event burst from vision pass** — at concurrency=4, ~4 events/sec for 20s. React handles fine; LogPane uses memoized buildLogLines so render cost stays low.
 - **PR scope** — SP3 touches ~12 frontend files + 4 backend files. Plan decomposes into ~12-15 tasks.
 - **Captions exposure** — `IngestResult.captions: list[Caption]` already exists; payload adds `captions_count: len(ingest.captions)`. No new ingestor work.
