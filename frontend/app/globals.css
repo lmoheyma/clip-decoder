@@ -947,6 +947,8 @@ html, body {
   position: relative;
   aspect-ratio: 16/9;
   width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
   border-radius: var(--r-2);
   overflow: hidden;
   background: var(--surface-strong);
@@ -1017,6 +1019,9 @@ html, body {
   gap: 4px;
   height: 16px;
   margin-top: 8px;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .now-palette span {
   flex: 1;
