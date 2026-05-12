@@ -1,16 +1,22 @@
 from __future__ import annotations
 import asyncio
 import logging
+import re
 from typing import Awaitable, Callable
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.sse import EventBus
 from app.db import AnalysisStatus, Database
 from app.pipeline.ingestor import parse_youtube_id
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
+
+_YOUTUBE_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
+_FRAME_ID_RE = re.compile(r"^shot_\d+$")
 
 
 class AnalyzeBody(BaseModel):
@@ -70,6 +76,21 @@ def build_router(
     async def flag(youtube_id: str, body: FlagBody) -> dict[str, str]:
         await db.flag_reference(youtube_id, body.ref_index, body.reason)
         return {"status": "ok"}
+
+    @router.get("/frames/{youtube_id}/{frame_id}")
+    def get_frame(youtube_id: str, frame_id: str):
+        if not _YOUTUBE_ID_RE.fullmatch(youtube_id):
+            raise HTTPException(status_code=400, detail="invalid youtube_id format")
+        if not _FRAME_ID_RE.fullmatch(frame_id):
+            raise HTTPException(status_code=400, detail="invalid frame_id format")
+        path = settings.data_dir / "frames" / youtube_id / f"{frame_id}.jpg"
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="frame not found")
+        return FileResponse(
+            path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
 
     @router.get("/stream/{youtube_id}")
     async def stream(youtube_id: str):
