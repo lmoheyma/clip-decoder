@@ -23,7 +23,16 @@ class EventBus:
     # subscriber. Without this, React batches every state update from
     # the burst into a single render and the pipeline display jumps
     # from empty to "done" with no visible animation.
-    _REPLAY_PACE_S: float = 0.18
+    # Slow pace for transitions (user perceives the pipeline progressing).
+    _REPLAY_PACE_TRANSITION_S: float = 0.18
+    # Fast pace for bursty per-frame/per-candidate events. With ~80
+    # vision_frame events per run, a uniform 0.18s would mean ~14s of
+    # replay on reload-mid-pipeline.
+    _REPLAY_PACE_BURST_S: float = 0.02
+    # Steps that fire in high-volume bursts during a run.
+    _BURST_STEPS: frozenset[str] = frozenset(
+        {"vision_frame", "crossref_candidate"}
+    )
 
     def __init__(self):
         self._queues: dict[str, list[asyncio.Queue[PipelineEvent | None]]] = (
@@ -61,7 +70,12 @@ class EventBus:
             for i, ev in enumerate(backlog):
                 yield ev
                 if i < len(backlog) - 1:
-                    await asyncio.sleep(self._REPLAY_PACE_S)
+                    pace = (
+                        self._REPLAY_PACE_BURST_S
+                        if ev.step in self._BURST_STEPS
+                        else self._REPLAY_PACE_TRANSITION_S
+                    )
+                    await asyncio.sleep(pace)
             if terminated:
                 return
             while True:
