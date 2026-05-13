@@ -118,7 +118,7 @@ The prompt template gains a new `{wikipedia_summary}` placeholder. If `summary_e
 
 ### 3. New module: WikidataEnricher (`backend/app/pipeline/wikidata_enricher.py`)
 
-**HTTP etiquette** — reuse the existing `WIKI_USER_AGENT` constant defined in `verifier.py` (move it to a shared module or import directly). Wikipedia/Wikidata APIs expect a custom User-Agent identifying the client.
+**HTTP etiquette** — import `WIKI_USER_AGENT` directly from `app.pipeline.verifier` (it's the only other consumer; no need for a new shared module). Wikipedia/Wikidata APIs expect a custom User-Agent identifying the client.
 
 ```python
 class WikidataEnricher:
@@ -242,7 +242,7 @@ import type { Report } from "./types";
 
 export async function fetchReportServer(youtubeId: string): Promise<Report | null> {
   const base =
-    process.env.INTERNAL_API_BASE_URL ?? "http://backend:8000";
+    process.env.BACKEND_URL ?? "http://backend:8000";
   const r = await fetch(`${base}/api/report/${encodeURIComponent(youtubeId)}`, {
     cache: "no-store",
   });
@@ -252,7 +252,7 @@ export async function fetchReportServer(youtubeId: string): Promise<Report | nul
 }
 ```
 
-`INTERNAL_API_BASE_URL` defaults to the docker-compose service name (`backend`) — same hostname used by the existing `/api/*` rewrites in `next.config.ts`. `cache: "no-store"` because a stale report payload during pipeline reruns would surface stale references.
+Reuses the existing `BACKEND_URL` env var (already consumed by `next.config.ts` for the `/api/*` rewrites and set by docker-compose), so the rewrite target and the server-side fetch target stay aligned. `cache: "no-store"` because a stale report payload during pipeline reruns would surface stale references.
 
 ### Component: `frontend/components/report/detail/ReferenceDetail.tsx` (client)
 
@@ -267,7 +267,7 @@ Wires the four sub-components, owns:
 
 - **`DetailSlate.tsx`** — top bar with `dot`, "FOCUS · REFERENCE {n+1} / {total}", `timestamp+shot_id`, then `← PREV` / `NEXT →` / `ESC` rendered as `<Link>`s. Bounds-disabled links use `aria-disabled="true"` and a `.disabled` class (no href).
 
-- **`DetailTopRow.tsx`** — verdict line ("● CONFIRMED · PAINTING · WIKIPEDIA VERIFIED · CONFIDENCE 0.92") + `<h1 className="serif-it">work_title <span className="by">— creator, year</span></h1>` + buttons NOT CONVINCED / JUMP. The "WIKIPEDIA ↗" external link present on the report card is intentionally **not** surfaced on the detail page top row (the mockup omits it). The wikipedia URL is implicit in the verdict line's "WIKIPEDIA VERIFIED" marker and the right-pane work metadata; users return to the grid for the explicit link.
+- **`DetailTopRow.tsx`** — verdict line built from `reference.final_confidence` (enum: "CONFIRMED"/"SPECULATIVE"/"HIDDEN") · `reference.work_type.toUpperCase()` · "WIKIPEDIA VERIFIED" (only when `wikipedia_url` non-null) · `CONFIDENCE ${raw_confidence.toFixed(2)}`. The numeric value comes from `raw_confidence` (pre-verify float), not from any "final confidence float" — the report doesn't store one + `<h1 className="serif-it">work_title <span className="by">— creator, year</span></h1>` + buttons NOT CONVINCED / JUMP. The "WIKIPEDIA ↗" external link present on the report card is intentionally **not** surfaced on the detail page top row (the mockup omits it). The wikipedia URL is implicit in the verdict line's "WIKIPEDIA VERIFIED" marker and the right-pane work metadata; users return to the grid for the explicit link.
 
 - **`DetailCompare.tsx`** — 2 panes in a 1fr/1fr grid:
   - Left pane: `<img src="/api/frames/{youtubeId}/{frame_id}">` with `onError` hide-on-fail. Body: `lbl` line "From the clip · {tc} · {frame_id}", `ttl` title "Frame {n} — {composition snippet}" (composition truncated to 60 chars), `sub` "Camera {camera_move} · ..." truncated as in the mockup.
@@ -381,6 +381,12 @@ No new API endpoints. The orchestrator's enrichment step is invisible to the fro
 `backend/tests/unit/test_verifier.py` (existing — adapt)
 - All tests that assert on `reasoning` must assert on the three new fields.
 - New test: malformed JSON missing one of the three reasoning fields → ValidationError → ref dropped.
+
+`backend/tests/unit/test_ref_proposer.py` (existing — adapt)
+- Any test that constructs or asserts on `candidate.reasoning` must drop the field (the model field is gone).
+
+`frontend/lib/reportStats.test.ts` (existing — adapt)
+- Fixtures that include `reasoning: "x"` must be updated to the new shape (the three reasoning fields + nullable Wikidata fields).
 
 `backend/tests/unit/test_wikidata_enricher.py` (new)
 - `test_enriches_with_medium_and_institution` — mock httpx to return a wikibase_item + claims for P186/P276/P571; assert ref comes back with all three fields filled.
