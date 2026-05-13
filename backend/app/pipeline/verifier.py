@@ -83,23 +83,35 @@ class Verifier:
         frame_index: dict[str, FrameAnalysis],
     ) -> VerifiedReference:
         async with self._sem:
+            # Wikipedia lookup FIRST so the LLM can ground wikipedia_reasoning
+            # in the summary. Cheap (HTTP-cached by Wikipedia's CDN) and worth
+            # running unconditionally — even for candidates the model will
+            # ultimately reject, the summary informs the adversarial pass.
+            if self._wiki:
+                wiki_url, wiki_thumb, summary = await self._wiki_lookup(
+                    candidate.work_title
+                )
+            else:
+                wiki_url, wiki_thumb, summary = None, None, ""
+
+            wiki_blob = summary if summary else "(no Wikipedia article available)"
+
             fa = frame_index.get(candidate.source_frame_id)
             fa_blob = fa.model_dump_json() if fa else "{}"
             cand_blob = candidate.model_dump_json()
             prompt = self._template.format(
-                candidate=cand_blob, frame_analysis=fa_blob
+                candidate=cand_blob,
+                frame_analysis=fa_blob,
+                wikipedia_summary=wiki_blob,
             )
             data = await self._nim.complete_text(
                 model=self._model,
                 messages=[{"role": "user", "content": prompt}],
                 json_mode=True,
             )
+
         verdict = Verdict(str(data.get("verdict", "reject")).lower())
         supporting = [str(x) for x in (data.get("supporting_elements") or [])]
-        wiki_url: str | None = None
-        wiki_thumb: str | None = None
-        if self._wiki and verdict is not Verdict.REJECT:
-            wiki_url, wiki_thumb = await self._wiki_lookup(candidate.work_title)
         bucket = self._bucket(verdict, wiki_url)
         return VerifiedReference(
             **candidate.model_dump(),
@@ -108,6 +120,9 @@ class Verifier:
             supporting_elements=supporting,
             wikipedia_url=wiki_url,
             wikipedia_thumbnail_url=wiki_thumb,
+            cross_ref_reasoning=str(data.get("cross_ref_reasoning", "")),
+            adversarial_reasoning=str(data.get("adversarial_reasoning", "")),
+            wikipedia_reasoning=str(data.get("wikipedia_reasoning", "")),
         )
 
     async def verify(
