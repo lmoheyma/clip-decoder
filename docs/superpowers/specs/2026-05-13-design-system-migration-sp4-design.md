@@ -24,7 +24,7 @@ The page is deep-linkable: `/report/{id}/ref/{n}` is a real URL that survives re
 | Decision | Choice | Rationale |
 | --- | --- | --- |
 | Route shape | `/report/[id]/ref/[n]/page.tsx` (App Router segment) | URL partageable, deep-linkable, scroll restoration handled by Next.js. Beats modal/overlay. |
-| Index semantics for `n` | Position in `report.references` (the unfiltered, timestamp-sorted array stored in the report) | Stable across reloads. Filters on the report page don't affect URLs. |
+| Index semantics for `n` | Position in `report.references` as stored — guaranteed equal to visual card order by sorting `references` by `timestamp_s` in the orchestrator before saving (see Backend §4) | Stable across reloads and consistent between deep-link and grid click. |
 | Reasoning split | Refactor verifier prompt to output `cross_ref_reasoning`, `adversarial_reasoning`, `wikipedia_reasoning` in one LLM call | Same cost as today. The model already reasons adversarially when the prompt asks. Beats heuristic split or a 3rd LLM pass. |
 | Medium / institution / inception | New `WikidataEnricher` module, called after `verify_all` in the orchestrator | Wikidata exposes structured claims (P186 material, P276 location, P571 inception). Reliable and free. |
 | Code structure | Approach B — Enricher is its own module, Verifier only changes for the reasoning fields | Single responsibility per module. Verifier stays focused on verdict + reasoning; Enricher focuses on external metadata. |
@@ -72,40 +72,53 @@ ingest → shots → vision → vision_frame ×N → crossref → crossref_candi
 
 ## Backend changes
 
-### 1. `VerifiedReference` model (`backend/app/models.py`)
+### 1. Pydantic models (`backend/app/models.py`)
 
-**Remove:**
-- `reasoning: str`
+`reasoning` currently lives on `ReferenceCandidate` (line 65), which `VerifiedReference` inherits from. Both ends of the pipeline need to change:
 
-**Add:**
+**`ReferenceCandidate`** — remove `reasoning: Annotated[str, Field(min_length=1)]`. The ref_proposer prompt must be updated in lock-step (see Backend §2.5) so the candidate JSON no longer contains a `reasoning` key. Existing tests that assert on `candidate.reasoning` must be adapted.
+
+**`VerifiedReference(ReferenceCandidate)`** — adds:
 - `cross_ref_reasoning: str`
 - `adversarial_reasoning: str`
 - `wikipedia_reasoning: str`
-- `medium: str | None`        (e.g. "oil on canvas")
-- `institution: str | None`   (e.g. "Museum of Modern Art")
-- `inception_year: int | None`
+- `medium: str | None = None`        (e.g. "oil on canvas")
+- `institution: str | None = None`   (e.g. "Museum of Modern Art")
+- `inception_year: int | None = None`
 
-All three Wikidata fields default to `None` so the schema accepts non-enriched refs (refs without a Wikipedia URL, or Wikidata fails). No backward-compat validator.
+The three Wikidata fields default to `None` so the schema accepts non-enriched refs (no Wikipedia URL, or Wikidata fails). The three reasoning fields are required (no fallback validator — see Out of scope).
 
 ### 2. Verifier refactor (`backend/app/pipeline/verifier.py`)
 
-The verifier already calls llama once per candidate with a JSON-mode prompt. Change is purely in the prompt template and the output shape:
+Three changes, in order:
 
-- **Prompt (`backend/app/prompts/verifier.md`)** — rewrite so llama returns:
-  ```json
-  {
-    "verdict": "keep" | "reject" | "speculative",
-    "supporting_elements": ["..."],
-    "cross_ref_reasoning": "...",
-    "adversarial_reasoning": "...",
-    "wikipedia_reasoning": "..."
-  }
-  ```
-  The prompt explicitly asks the model to (a) argue *for* the match (cross-ref), (b) argue *against* the match (adversarial), (c) state whether the candidate is consistent with the supplied Wikipedia summary (wikipedia).
-- The Wikipedia summary text (currently fetched only for the URL+thumbnail) is now passed into the prompt context, so the wikipedia_reasoning has something to ground on. If `wikipedia_summary` is empty/None, the prompt instructs the model to write a one-line "No Wikipedia article available." style note in `wikipedia_reasoning`.
-- `_verify_one` returns the model output directly into the `VerifiedReference` constructor; Pydantic enforces the three fields are present. ValidationError → ref dropped (same as today).
+**2a. `_wiki_lookup` returns the summary extract too.** Today it returns `(page_url, thumb_url)` and discards `data["extract"]`. Change the signature to `(page_url, thumb_url, summary_extract)` and capture `data.get("extract", "")`. All three default to `None`/`""` on failure.
+
+**2b. Reorder the verify-one flow.** Today: LLM call → wiki lookup (gated on `verdict != REJECT`). New: **wiki lookup first**, then LLM call **with the summary text in context**. The LLM uses the summary to produce `wikipedia_reasoning`; the lookup must therefore happen unconditionally for every candidate (cheap, cached by Wikipedia's CDN). Removed: the `if self._wiki and verdict is not Verdict.REJECT:` gate.
+
+**2c. New verifier prompt (`backend/app/prompts/verifier.md`)**.
+
+The current prompt produces `{verdict, supporting_elements, final_confidence, rationale}`. Of those, only `verdict` and `supporting_elements` are read by `_verify_one` today; `final_confidence` and `rationale` are unused. The new prompt drops both unused fields and adds the three reasoning fields:
+
+```
+{
+  "verdict": "keep" | "speculative" | "reject",
+  "supporting_elements": ["...", "..."],
+  "cross_ref_reasoning": "<defend the match using concrete frame elements>",
+  "adversarial_reasoning": "<argue against the match — what would make this wrong?>",
+  "wikipedia_reasoning": "<is the candidate consistent with the supplied Wikipedia summary?>"
+}
+```
+
+The prompt template gains a new `{wikipedia_summary}` placeholder. If `summary_extract` is empty, the orchestrator passes `"(no Wikipedia article available)"` and instructs llama in the prompt to write a matching one-line note in `wikipedia_reasoning`.
+
+`_verify_one` constructs `VerifiedReference(**candidate.model_dump(), **llama_output, wikipedia_url=…, wikipedia_thumbnail_url=…)`. Pydantic enforces all three reasoning fields are present. ValidationError → ref dropped (existing `verify_all` `return_exceptions=True` handler).
+
+**2.5. ref_proposer prompt** (`backend/app/prompts/ref_proposer.md` + `ref_proposer_complement.md`) — drop the `reasoning` field from the candidate output JSON. Update tests in `test_ref_proposer.py` that assert on `candidate.reasoning`.
 
 ### 3. New module: WikidataEnricher (`backend/app/pipeline/wikidata_enricher.py`)
+
+**HTTP etiquette** — reuse the existing `WIKI_USER_AGENT` constant defined in `verifier.py` (move it to a shared module or import directly). Wikipedia/Wikidata APIs expect a custom User-Agent identifying the client.
 
 ```python
 class WikidataEnricher:
@@ -125,9 +138,9 @@ Per-ref flow (skip silently if `ref.wikipedia_url` is None):
 1. **Extract slug from `wikipedia_url`** — e.g. `https://en.wikipedia.org/wiki/Le_faux_miroir` → `Le_faux_miroir`.
 2. **Wikipedia → Wikidata QID** — call `https://en.wikipedia.org/w/api.php?action=query&prop=pageprops&format=json&titles=<slug>` and read `pageprops.wikibase_item`. If absent, return the ref unchanged.
 3. **Wikidata claims** — call `https://www.wikidata.org/wiki/Special:EntityData/<QID>.json` and extract:
-   - `P186` (material used) → first claim's `mainsnak.datavalue.value.id` (a QID) → resolved to label via `wbgetentities`
-   - `P276` (location) → idem
-   - `P571` (inception) → claim's `time` field (ISO date like `"+1929-00-00T00:00:00Z"`) → parsed to year int
+   - `P186` (material used) → claims may have several statements (canvas + oil, etc.); pick deterministically: highest `rank` first ("preferred" > "normal" > "deprecated"), then first by JSON order. Resolve the QID via `wbgetentities`.
+   - `P276` (location) → same deterministic selection rule.
+   - `P571` (inception) → claim's `time` field (ISO date like `"+1929-00-00T00:00:00Z"`) → parse the year (leading `+` allowed, BC dates negative). Same rank/order rule if multiple.
 4. **Resolve QIDs to English labels** — batch via `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=Q123|Q456&props=labels&languages=en&format=json`.
 5. Return a new `VerifiedReference` with `medium`, `institution`, `inception_year` filled (or null if any step failed for this field).
 
@@ -148,9 +161,10 @@ try:
 except Exception:
     logger.exception("wikidata enrichment failed")
     enriched = verified  # graceful degrade: all medium/institution stay None
+enriched.sort(key=lambda r: r.timestamp_s)  # stable visual order
 ```
 
-`Report.references = enriched`, then existing save/done flow.
+The `sort` guarantees `report.references[n]` lines up with the n-th card the user sees on the report grid, since `ReportContent.tsx` already sorts the same way at render time. This makes the deep-link `/report/{id}/ref/0` always resolve to the visually-first card. `Report.references = enriched`, then existing save/done flow.
 
 ### 5. Settings (`backend/app/settings.py`)
 
@@ -160,7 +174,7 @@ wikidata_concurrency: int = 4
 wikidata_timeout_s: float = 10.0
 ```
 
-When `wikidata_enrichment` is False, the orchestrator skips the enrich call and `enriched = verified` directly. Used in tests to avoid hitting Wikidata.
+When `wikidata_enrichment` is False, the orchestrator skips the enrich call and `enriched = verified` directly. Used in tests to avoid hitting Wikidata. Naming note: parallel to the existing `wikipedia_verification` setting (which controls the verifier's Wikipedia URL/thumb lookup). The two are independent — Wikipedia verification can stay on while Wikidata enrichment is off, useful when only the URL+thumbnail+summary are needed.
 
 ### 6. main.py wiring
 
@@ -203,7 +217,7 @@ export interface VerifiedReference {
 
 ```tsx
 import { notFound } from "next/navigation";
-import { fetchReport } from "@/lib/api";
+import { fetchReportServer } from "@/lib/api-server";
 import { ReferenceDetail } from "@/components/report/detail/ReferenceDetail";
 
 export default async function Page({
@@ -214,11 +228,31 @@ export default async function Page({
   const { id, n } = await params;
   const idx = Number.parseInt(n, 10);
   if (Number.isNaN(idx) || idx < 0) notFound();
-  const report = await fetchReport(id);
+  const report = await fetchReportServer(id);
   if (!report || idx >= report.references.length) notFound();
   return <ReferenceDetail report={report} index={idx} />;
 }
 ```
+
+**`frontend/lib/api-server.ts` (new)** — the existing `fetchReport` in `lib/api.ts` uses the relative URL `/api/report/${id}`, which works only in the browser. Server components need an absolute URL. New helper:
+
+```ts
+import "server-only";
+import type { Report } from "./types";
+
+export async function fetchReportServer(youtubeId: string): Promise<Report | null> {
+  const base =
+    process.env.INTERNAL_API_BASE_URL ?? "http://backend:8000";
+  const r = await fetch(`${base}/api/report/${encodeURIComponent(youtubeId)}`, {
+    cache: "no-store",
+  });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`report failed: ${r.status}`);
+  return (await r.json()) as Report;
+}
+```
+
+`INTERNAL_API_BASE_URL` defaults to the docker-compose service name (`backend`) — same hostname used by the existing `/api/*` rewrites in `next.config.ts`. `cache: "no-store"` because a stale report payload during pipeline reruns would surface stale references.
 
 ### Component: `frontend/components/report/detail/ReferenceDetail.tsx` (client)
 
@@ -233,25 +267,54 @@ Wires the four sub-components, owns:
 
 - **`DetailSlate.tsx`** — top bar with `dot`, "FOCUS · REFERENCE {n+1} / {total}", `timestamp+shot_id`, then `← PREV` / `NEXT →` / `ESC` rendered as `<Link>`s. Bounds-disabled links use `aria-disabled="true"` and a `.disabled` class (no href).
 
-- **`DetailTopRow.tsx`** — verdict line ("● CONFIRMED · PAINTING · WIKIPEDIA VERIFIED · CONFIDENCE 0.92") + `<h1 className="serif-it">work_title <span className="by">— creator, year</span></h1>` + buttons NOT CONVINCED / JUMP.
+- **`DetailTopRow.tsx`** — verdict line ("● CONFIRMED · PAINTING · WIKIPEDIA VERIFIED · CONFIDENCE 0.92") + `<h1 className="serif-it">work_title <span className="by">— creator, year</span></h1>` + buttons NOT CONVINCED / JUMP. The "WIKIPEDIA ↗" external link present on the report card is intentionally **not** surfaced on the detail page top row (the mockup omits it). The wikipedia URL is implicit in the verdict line's "WIKIPEDIA VERIFIED" marker and the right-pane work metadata; users return to the grid for the explicit link.
 
 - **`DetailCompare.tsx`** — 2 panes in a 1fr/1fr grid:
-  - Left pane: `<img src="/api/frames/{youtubeId}/{frame_id}">` with `onError` hide-on-fail. Body: "From the clip · {tc} · {frame_id}", title "Frame {n} — {composition snippet}", sub "Camera {camera_move} · ...".
-  - Right pane: `<img src={wikipedia_thumbnail_url}>` if non-null, else `<div className="img-placeholder">Reference image · drop here</div>` styled with aged-paper background. Body: title (serif italic), sub "CREATOR · YEAR · MEDIUM · INSTITUTION" — fields joined with " · ", null fields skipped.
+  - Left pane: `<img src="/api/frames/{youtubeId}/{frame_id}">` with `onError` hide-on-fail. Body: `lbl` line "From the clip · {tc} · {frame_id}", `ttl` title "Frame {n} — {composition snippet}" (composition truncated to 60 chars), `sub` "Camera {camera_move} · ..." truncated as in the mockup.
+  - Right pane: `lbl` line "Reference work" (peach uppercase, mockup line 1373), `ttl` title (serif italic, the work title), `sub` "CREATOR · YEAR · MEDIUM · INSTITUTION" — fields joined with " · ", null fields skipped. Image: `<img src={wikipedia_thumbnail_url}>` if non-null, else `<div className="img-placeholder">Reference image · drop here</div>` styled with aged-paper background (subtle linear-gradient).
 
 - **`DetailEvidence.tsx`** — 1.4fr/1fr grid:
   - Left: `<DetailReasoning>`:
-    - Pull-quote: first sentence of `cross_ref_reasoning` rendered in serif italic with peach left-border.
+    - Header (italic serif, muted) "EVIDENCE CHAIN · CROSS-REFERENCE → VERIFY" (mockup line 1382).
+    - Pull-quote: the first sentence of `cross_ref_reasoning`, computed via the regex `/^.*?[.!?](?:\s|$)/` with a 240-char fallback cap (slice + ellipsis) if no terminator found. Rendered in serif italic with a 2px peach left-border, padding-left 16px.
     - Three labeled paragraphs: **Cross-reference pass** / **Adversarial pass** / **Wikipedia** rendering the full three fields.
   - Right: `<DetailFrameAnalysis>`:
-    - `<dl>` with rows: Composition, Palette (swatches from `palette_hex` + label from `palette` descriptors), Camera, Costume / Setting, Distinctive features, Vision confidence (`raw_confidence.toFixed(2)`).
-    - If `frame_analyses` does not contain the ref's `source_frame_id`, render a single hairline "Frame analysis unavailable" instead.
+    - Italic-serif header "Frame analysis" (mockup line 1407).
+    - `<dl>` with rows: Composition, Palette, Camera, Costume / Setting, Distinctive features, Vision confidence.
+    - Palette row: swatches from `palette_hex` followed by the descriptors from `palette` joined with " → " and uppercased (e.g. "MIDNIGHT → SODIUM"), mono font, muted color.
+    - Vision confidence: `raw_confidence.toFixed(2)` (the report itself has no separate "final" verification confidence — display the raw value with a hairline note explaining it's pre-verify).
+    - If `frame_analyses` does not contain the ref's `source_frame_id`, render a single hairline "Frame analysis unavailable" instead of the dl.
+
+### `ReportContent.tsx` — new hash-based seek
+
+The detail page's JUMP action returns the user to `/report/{id}#t={timestamp}`. The report page must read that hash on mount and seek the embedded player. No such handler exists today. Add to `ReportContent.tsx`:
+
+```ts
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  const m = window.location.hash.match(/^#t=(\d+(?:\.\d+)?)$/);
+  if (!m) return;
+  const t = Number.parseFloat(m[1]);
+  if (Number.isNaN(t)) return;
+  // wait one frame for VideoPlayer to mount; then seek and clear the hash
+  // so a later share/copy of the URL does not re-seek silently
+  const timer = setTimeout(() => {
+    playerRef.current?.seekTo(t);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, 0);
+  return () => clearTimeout(timer);
+}, [report]);
+```
+
+The `[report]` dep ensures we only seek once the report (and therefore the player) has rendered.
 
 ### `ReferenceCard.tsx` update
 
-- The whole-card click no longer calls `onJump`; it pushes the route via a wrapping `<Link href={'/report/{id}/ref/{idx}'}>` (the `<article>` becomes its child). Keyboard nav (Enter / Space) is handled natively by Link.
-- The "▸ JUMP TO {tc}" inline button keeps its current behavior (seek the embedded player). It uses `e.preventDefault(); e.stopPropagation()` so the click doesn't also navigate.
-- The "reasoning" string shown on the card is now `reference.cross_ref_reasoning` (one paragraph, most concise of the three).
+- The whole-card click opens the detail page. Implementation: wrap only the card's visual region (the `.ref-left` thumb + the title/verdict block) in a `<Link href={'/report/{id}/ref/{idx}'}>`. The `.ref-actions` row stays outside the Link so its existing `<a>` JUMP/WIKIPEDIA/NOT-CONVINCED elements are not nested inside another anchor (invalid HTML).
+- The three `.ref-actions` anchors that exist today as `<a className="ulink">` with `onClick` handlers should be migrated to `<button className="ulink">` for the JUMP and NOT-CONVINCED handlers (they're not navigation); the WIKIPEDIA external link stays an `<a href target="_blank">`. This sidesteps the nested-anchor issue regardless of how the Link wraps.
+- The `<article role="button" tabIndex={0} onKeyDown={handleKey} onClick={onJump}>` shell loses its role/tabIndex/keydown/onClick; the Link handles keyboard nav natively.
+- `onJump` prop signature unchanged — still wired to the inline JUMP button (the inline player seek behavior). The whole-card click no longer triggers `onJump`; only the explicit button does.
+- The "reasoning" string shown on the card is now `reference.cross_ref_reasoning` (one paragraph, the most defense-oriented of the three — closest to the previous concatenated reasoning).
 
 ### CSS additions (`frontend/app/globals.css`)
 
@@ -272,15 +335,15 @@ All animations respect `prefers-reduced-motion: reduce`.
 ## Data flow
 
 ```
-1. User on /report/{id}, sees grid of ReferenceCards
-2. Click card → <Link> push to /report/{id}/ref/{n}
-3. Server fetches report (cached by Next data cache; SSR returns HTML)
-4. Page component validates n, hands report+index to <ReferenceDetail>
-5. <ReferenceDetail> renders. Keyboard listener mounted.
-6. User hits ←/→ → router.push to /ref/{n-1} or /ref/{n+1}
-7. ESC → router.push('/report/{id}')
-8. JUMP → router.push('/report/{id}#t={timestamp}'), report seeks on mount
-9. NOT CONVINCED → POST /api/report/{id}/flag (existing endpoint)
+1. User on /report/{id}, sees grid of ReferenceCards (sorted by timestamp_s, mirroring the backend's stored order from §4).
+2. Click card → `<Link>` to `/report/{id}/ref/{n}` (where `n` is the same index used when sorting the grid).
+3. Server component fetches the report via `fetchReportServer(id)` (absolute URL); SSR returns HTML.
+4. Page component validates n, hands `report` + `index` to `<ReferenceDetail>`.
+5. `<ReferenceDetail>` renders. Keyboard listener mounted on `window`.
+6. User hits ←/→ → `router.push('/report/{id}/ref/{n±1}')`.
+7. ESC → `router.push('/report/{id}')`.
+8. JUMP → `router.push('/report/{id}#t={timestamp}')`. The report page's new hash-seek `useEffect` (see Frontend §`ReportContent.tsx`) seeks the player and clears the hash.
+9. NOT CONVINCED → existing `flagReference(youtubeId, idx)` → `POST /api/report/{id}/flag` (no new endpoint).
 ```
 
 No new API endpoints. The orchestrator's enrichment step is invisible to the frontend except that the report payload now contains the new fields.
@@ -309,7 +372,7 @@ No new API endpoints. The orchestrator's enrichment step is invisible to the fro
 | `/api/frames/{id}/{frame_id}` 404 | `onError` hides the img, the placeholder remains |
 | `wikipedia_thumbnail_url` null | Aged-paper placeholder pane on the right |
 | At edge (n=0 → PREV, n=last → NEXT) | Disabled `<Link>` (`aria-disabled`, `.disabled` class, no href) |
-| Old report JSON in DB (pre-SP4 shape) | Pydantic ValidationError on read → /api/report/{id} returns 500 → /report/{id} shows the existing error UI. User reruns the analysis. Acceptable in dev. |
+| Old report JSON in DB (pre-SP4 shape) | Pydantic ValidationError on read → /api/report/{id} returns 500 → /report/{id} shows the existing error UI. User reruns the analysis (intentional, per Out of scope). |
 
 ## Testing
 
@@ -346,6 +409,11 @@ No new API endpoints. The orchestrator's enrichment step is invisible to the fro
 - `index=0` → PREV link has `aria-disabled="true"` and `.disabled` class, no href; NEXT is enabled.
 - `index=total-1` → NEXT disabled, PREV enabled.
 - Keyboard: simulate ArrowLeft/ArrowRight/Escape → mocked `router.push` called with the right path.
+
+`frontend/components/report/ReportContent.test.tsx` (new) — for the hash-seek useEffect
+- Initial `window.location.hash = "#t=42.5"` + mocked `playerRef.current.seekTo` → after mount, `seekTo(42.5)` called once, then `window.location.hash` is empty.
+- Initial hash absent → `seekTo` not called.
+- Malformed hash (`#t=abc`, `#foo`) → `seekTo` not called.
 
 No test for the route file itself (server component, covered by TSC + manual e2e).
 
