@@ -1,5 +1,5 @@
 from unittest.mock import AsyncMock
-from app.models import FrameAnalysis
+from app.models import FrameAnalysis, ReferenceCandidate
 from app.pipeline.ref_proposer import RefProposer
 
 
@@ -234,3 +234,38 @@ async def test_pass1_empty_pass2_still_runs_permissive():
     assert "Types already proposed by the previous pass: (none)" in pass2_prompt
     assert len(out) == 1
     assert out[0].work_title == "Trans-fixed"
+
+
+async def test_on_candidate_callback_called_for_each_merged_candidate(monkeypatch):
+    """on_candidate is invoked once per merged ReferenceCandidate."""
+    proposer = RefProposer(nim_client=AsyncMock(), model="m")
+
+    fake_pass1 = [
+        ReferenceCandidate(
+            timestamp_s=10.0, source_frame_id="shot_01",
+            work_title="A", work_creator="X", work_year=2000,
+            work_type="painting", reasoning="r", raw_confidence=0.8,
+        ),
+        ReferenceCandidate(
+            timestamp_s=20.0, source_frame_id="shot_02",
+            work_title="B", work_creator="Y", work_year=2001,
+            work_type="film", reasoning="r", raw_confidence=0.7,
+        ),
+    ]
+
+    async def fake_call(template, ctx):
+        return fake_pass1 if "types_covered" not in ctx else []
+
+    monkeypatch.setattr(proposer, "_call", fake_call)
+
+    received: list[str] = []
+    async def on_candidate(c):
+        received.append(c.work_title)
+
+    out = await proposer.propose(
+        title="t", channel="c", lyrics_text="",
+        frame_analyses=[], on_candidate=on_candidate,
+    )
+
+    assert len(out) == 2
+    assert received == ["A", "B"]

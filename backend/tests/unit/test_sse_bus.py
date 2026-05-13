@@ -75,9 +75,10 @@ async def test_replay_is_paced_to_avoid_react_batching(monkeypatch):
     async for ev in bus.subscribe("vid"):
         received.append(ev.step)
 
-    # 4 replay events ⇒ 3 inter-event waits of _REPLAY_PACE_S each.
+    # 4 replay events ⇒ 3 inter-event waits. All transition steps
+    # (no vision_frame/crossref_candidate) so each waits the transition pace.
     assert received == ["ingest", "shots", "vision", "done"]
-    assert sleeps == [bus._REPLAY_PACE_S] * 3
+    assert sleeps == [bus._REPLAY_PACE_TRANSITION_S] * 3
 
 
 @pytest.mark.asyncio

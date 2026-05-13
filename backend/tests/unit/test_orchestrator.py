@@ -15,6 +15,127 @@ from app.pipeline.orchestrator import Orchestrator
 from app.db import Database, AnalysisStatus
 
 
+# ---------------------------------------------------------------------------
+# Shared helpers for new tests
+# ---------------------------------------------------------------------------
+
+def _make_orchestrator(tmp_path: Path, *, keyframes, fa_results, candidates):
+    """Return (orch, bus, received_list) with all mocks wired up."""
+    db_mock = AsyncMock()
+    db_mock.get_status = AsyncMock(return_value=AnalysisStatus.DONE)
+    db_mock.save_report = AsyncMock()
+    db_mock.set_status = AsyncMock()
+
+    bus = EventBus()
+
+    ingestor = MagicMock()
+    ingestor.ingest.return_value = IngestResult(
+        youtube_id="abc",
+        video_path=tmp_path / "v.mp4",
+        title="My Title",
+        channel="My Channel",
+        duration_s=120.0,
+        captions=[],
+    )
+
+    sampler = MagicMock()
+    sampler.sample.return_value = keyframes
+
+    # frame_analyzer.analyze must actually call on_frame for each result.
+    async def _analyze(kfs, on_frame=None):
+        for i, fa in enumerate(fa_results):
+            if on_frame:
+                await on_frame(fa, i + 1, len(fa_results))
+        return fa_results
+
+    frame_analyzer = MagicMock()
+    frame_analyzer.analyze = _analyze
+
+    # ref_proposer.propose must actually call on_candidate for each candidate.
+    async def _propose(*, title, channel, lyrics_text, frame_analyses, on_candidate=None):
+        for c in candidates:
+            if on_candidate:
+                await on_candidate(c)
+        return candidates
+
+    ref_proposer = MagicMock()
+    ref_proposer.propose = _propose
+
+    verifier = AsyncMock()
+    verifier.verify_all.return_value = [
+        VerifiedReference(
+            **candidates[0].model_dump(),
+            verdict=Verdict.KEEP,
+            final_confidence=Confidence.CONFIRMED,
+            supporting_elements=["a"],
+            wikipedia_url=None,
+        )
+    ] if candidates else []
+
+    orch = Orchestrator(
+        db=db_mock,
+        bus=bus,
+        ingestor=ingestor,
+        sampler=sampler,
+        frame_analyzer=frame_analyzer,
+        ref_proposer=ref_proposer,
+        verifier=verifier,
+    )
+    return orch, bus
+
+
+def _default_fixtures(tmp_path: Path):
+    img = tmp_path / "shot_00.jpg"
+    img.write_bytes(b"x")
+    img1 = tmp_path / "shot_01.jpg"
+    img1.write_bytes(b"x")
+
+    keyframes = [
+        KeyFrame(shot_id="shot_00", timestamp_s=1.0, frame_path=img),
+        KeyFrame(shot_id="shot_01", timestamp_s=3.0, frame_path=img1),
+    ]
+    fa_results = [
+        FrameAnalysis(
+            timestamp_s=1.0, frame_id="shot_00",
+            composition="wide", palette=["red"], palette_hex=["#ff0000"],
+            camera_move="static", costume_setting="outdoor",
+            distinctive_features=[], raw_description="A wide shot",
+            confidence_in_observation=0.9,
+        ),
+        FrameAnalysis(
+            timestamp_s=3.0, frame_id="shot_01",
+            composition="close", palette=["blue"], palette_hex=["#0000ff"],
+            camera_move="pan", costume_setting="indoor",
+            distinctive_features=[], raw_description="A close-up",
+            confidence_in_observation=0.8,
+        ),
+    ]
+    candidates = [
+        ReferenceCandidate(
+            timestamp_s=1.0, source_frame_id="shot_00",
+            work_title="The Shining", work_creator="Kubrick",
+            work_year=1980, work_type="film",
+            reasoning="x", raw_confidence=0.8,
+        )
+    ]
+    return keyframes, fa_results, candidates
+
+
+async def _run_and_collect(orch: Orchestrator, bus: EventBus) -> list:
+    received: list = []
+
+    async def collect():
+        async for ev in bus.subscribe("abc"):
+            received.append(ev)
+            if ev.step == "done":
+                break
+
+    consumer = asyncio.create_task(collect())
+    await orch.run("https://www.youtube.com/watch?v=abc")
+    await asyncio.wait_for(consumer, timeout=2.0)
+    return received
+
+
 async def test_full_pipeline_emits_events_and_saves(tmp_path: Path):
     db = Database(db_path=tmp_path / "t.sqlite")
     await db.init()
@@ -91,3 +212,66 @@ async def test_full_pipeline_emits_events_and_saves(tmp_path: Path):
     report = await db.load_report("abc")
     assert report is not None
     assert report.references[0].work_title == "The Shining"
+
+
+# ---------------------------------------------------------------------------
+# New TDD tests for Task 3
+# ---------------------------------------------------------------------------
+
+async def test_ingest_event_includes_clip_metadata(tmp_path: Path):
+    keyframes, fa_results, candidates = _default_fixtures(tmp_path)
+    orch, bus = _make_orchestrator(tmp_path, keyframes=keyframes, fa_results=fa_results, candidates=candidates)
+    received = await _run_and_collect(orch, bus)
+
+    ingest_events = [e for e in received if e.step == "ingest"]
+    assert ingest_events, "No ingest event found"
+    payload = ingest_events[0].payload
+    assert "title" in payload, f"title missing from ingest payload: {payload}"
+    assert "channel" in payload, f"channel missing from ingest payload: {payload}"
+    assert "duration_s" in payload, f"duration_s missing from ingest payload: {payload}"
+    assert "captions_count" in payload, f"captions_count missing from ingest payload: {payload}"
+    assert payload["title"] == "My Title"
+    assert payload["channel"] == "My Channel"
+    assert payload["duration_s"] == 120.0
+    assert payload["captions_count"] == 0
+
+
+async def test_shots_event_includes_keyframes_list(tmp_path: Path):
+    keyframes, fa_results, candidates = _default_fixtures(tmp_path)
+    orch, bus = _make_orchestrator(tmp_path, keyframes=keyframes, fa_results=fa_results, candidates=candidates)
+    received = await _run_and_collect(orch, bus)
+
+    shots_events = [e for e in received if e.step == "shots"]
+    assert shots_events, "No shots event found"
+    payload = shots_events[0].payload
+    assert "shot_count" in payload
+    assert "keyframes" in payload, f"keyframes missing from shots payload: {payload}"
+    kfs = payload["keyframes"]
+    assert len(kfs) == payload["shot_count"]
+    for kf in kfs:
+        assert "shot_id" in kf, f"shot_id missing from keyframe: {kf}"
+        assert "timestamp_s" in kf, f"timestamp_s missing from keyframe: {kf}"
+    assert kfs[0]["shot_id"] == "shot_00"
+    assert kfs[1]["shot_id"] == "shot_01"
+
+
+async def test_vision_frame_events_emitted_per_frame(tmp_path: Path):
+    keyframes, fa_results, candidates = _default_fixtures(tmp_path)
+    orch, bus = _make_orchestrator(tmp_path, keyframes=keyframes, fa_results=fa_results, candidates=candidates)
+    received = await _run_and_collect(orch, bus)
+
+    vf_events = [e for e in received if e.step == "vision_frame"]
+    assert len(vf_events) >= 1, "No vision_frame events found"
+    assert len(vf_events) == len(fa_results), (
+        f"Expected {len(fa_results)} vision_frame events, got {len(vf_events)}"
+    )
+    for ev in vf_events:
+        p = ev.payload
+        assert "frame_id" in p, f"frame_id missing: {p}"
+        assert "timestamp_s" in p, f"timestamp_s missing: {p}"
+        assert "shot_index" in p, f"shot_index missing: {p}"
+        assert "total_shots" in p, f"total_shots missing: {p}"
+        assert "raw_description" in p, f"raw_description missing: {p}"
+        assert "composition" in p, f"composition missing: {p}"
+        assert "palette_hex" in p, f"palette_hex missing: {p}"
+        assert 1 <= p["shot_index"] <= p["total_shots"]

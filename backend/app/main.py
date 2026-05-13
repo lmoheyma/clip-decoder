@@ -29,6 +29,13 @@ def build_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await db.init()
+        orphans = await db.mark_orphans_as_error(
+            "Pipeline interrupted (server restarted before completion)."
+        )
+        if orphans:
+            logging.getLogger(__name__).info(
+                "marked %d orphaned running analyses as error", orphans
+            )
         yield
 
     app = FastAPI(title="ClipDecoder API", version="0.1.0", lifespan=lifespan)

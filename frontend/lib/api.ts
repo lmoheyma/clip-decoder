@@ -42,23 +42,74 @@ export async function flagReference(
 export function subscribePipeline(
   youtubeId: string,
   onEvent: (e: PipelineEvent) => void,
-  onError?: (err: unknown) => void,
+  onError?: (message: string) => void,
 ): () => void {
   const es = new EventSource(`/api/stream/${encodeURIComponent(youtubeId)}`);
+  // Steps that map to named SSE events emitted by the backend.
   const stepNames: PipelineEvent["step"][] = [
-    "ingest", "shots", "vision", "crossref", "verify", "done", "error",
+    "ingest",
+    "shots",
+    "vision",
+    "vision_frame",
+    "crossref",
+    "crossref_candidate",
+    "verify",
+    "nim_retry",
+    "done",
+    "error",
   ];
+  // Deduplication: on EventSource auto-reconnect the backend replays the
+  // full history. Without this Set, every reconnect duplicates log lines
+  // and candidate cards in the UI.
+  const seen = new Set<string>();
+  // After we receive a terminal `done` or `error` event we close the
+  // EventSource ourselves — that close() then fires onerror with
+  // readyState=CLOSED, which would otherwise clobber the real error
+  // message with a generic "connection lost" string. Track that we
+  // closed deliberately so onerror can ignore it.
+  let terminated = false;
+  function eventKey(e: PipelineEvent): string {
+    const p = e.payload as Record<string, unknown>;
+    const id =
+      (p?.frame_id as string | undefined) ??
+      (p?.work_title as string | undefined) ??
+      (p?.source_frame_id as string | undefined) ??
+      e.message;
+    return `${e.step}:${id}:${e.progress}`;
+  }
   for (const step of stepNames) {
     es.addEventListener(step, (raw) => {
       try {
         const data = JSON.parse((raw as MessageEvent).data) as PipelineEvent;
+        const key = eventKey(data);
+        if (seen.has(key)) return;
+        seen.add(key);
         onEvent(data);
-        if (data.step === "done" || data.step === "error") es.close();
+        if (data.step === "done" || data.step === "error") {
+          terminated = true;
+          es.close();
+        }
       } catch (err) {
-        onError?.(err);
+        onError?.(
+          err instanceof Error ? err.message : "Malformed pipeline event",
+        );
       }
     });
   }
-  es.onerror = (err) => onError?.(err);
-  return () => es.close();
+  // EventSource's onerror fires on transient drops (browser auto-retries)
+  // AND on permanent failures. We only surface a user-visible error when
+  // the connection is permanently closed — otherwise the browser is just
+  // reconnecting and we'd flash bogus errors for routine network blips.
+  es.onerror = () => {
+    if (terminated) return;
+    if (es.readyState === EventSource.CLOSED) {
+      onError?.(
+        "Connection to the pipeline stream was lost before it finished.",
+      );
+    }
+  };
+  return () => {
+    terminated = true;
+    es.close();
+  };
 }

@@ -112,6 +112,34 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
+/* Editorial scrollbar — slim, warm-tone, peach-on-hover. Applies to
+   any scrollable surface (page chrome, log panes, candidates lane). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--grad-peach);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ─────────────────────────────────────────────────────────────────
    SP1 — Component primitives (editorial register).
    Slate, buttons, chips, kbd, type primitives.
@@ -823,6 +851,442 @@ html, body {
 }
 
 /* ─────────────────────────────────────────────────────────────────
+   SP3 — Pipeline live page components.
+   3-column stage, clip metadata, pipeline rows, now frame, keyframe
+   strip, log pane, candidates pane, footer slate.
+   ───────────────────────────────────────────────────────────────── */
+
+.pipeline-stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  padding: clamp(28px, 4vw, 48px) clamp(32px, 5vw, 64px) 32px;
+}
+@media (min-width: 1024px) {
+  .pipeline-stage { grid-template-columns: 350px minmax(0, 1fr) 320px; }
+}
+.pipeline-col-left, .pipeline-col-center, .pipeline-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pipeline-h2 {
+  font-size: clamp(40px, 5vw, 72px);
+  line-height: 0.96;
+  margin: 0 0 24px;
+  color: var(--ink);
+}
+
+.clip-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+.clip-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.clip-meta dt {
+  font-family: var(--sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.clip-meta dd {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--body-strong);
+}
+.clip-meta dd.mono { font-family: var(--sans); letter-spacing: 0.1em; }
+.clip-meta dd.serif { font-family: var(--serif); font-size: 18px; font-style: italic; }
+
+.pipeline-list {
+  border: 1px solid var(--hairline);
+  background: var(--canvas-soft);
+  border-radius: var(--r-2);
+  padding: 4px 16px;
+}
+.pipeline-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-family: var(--sans);
+  font-size: 15px;
+  padding: 16px 0;
+  color: var(--ink);
+  border-bottom: 1px solid var(--hairline);
+}
+.pipeline-row:last-child { border-bottom: 0; }
+.pipeline-row .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: 180px;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--ink);
+}
+.pipeline-row .pill .num {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+  width: 24px;
+}
+.pipeline-row .pill em { font-style: normal; }
+.pipeline-row .progress {
+  flex: 1;
+  height: 2px;
+  background: var(--hairline);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  position: relative;
+}
+.pipeline-row .progress i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: var(--r-pill);
+}
+.pipeline-row.done .progress i { background: var(--body); }
+.pipeline-row.error .progress i { background: var(--error); }
+.pipeline-row .frac {
+  color: var(--body);
+  min-width: 90px;
+  text-align: right;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+}
+.pipeline-row.done .frac { color: var(--muted); }
+.pipeline-row.active .pill em { color: var(--ink); }
+.pipeline-row:not(.done):not(.active):not(.error) .pill em { color: var(--muted); }
+.pipeline-row:not(.done):not(.active):not(.error) .pill .num { color: var(--muted-soft); }
+
+/* Active-stage motion — peach pulse on the num + a sweeping bar on the
+   progress lane. Borrows the scan/peach motif from NowFrame so the
+   pipeline list reads as part of the same instrument, not a generic
+   loading spinner. The sweep runs even when progress fraction is 0
+   (e.g. while the LLM is thinking) so the user always sees something
+   alive. */
+.pipeline-row.active .pill .num {
+  color: var(--grad-peach);
+  position: relative;
+}
+.pipeline-row.active .pill .num::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: var(--grad-peach);
+  box-shadow: 0 0 0 0 var(--grad-peach);
+  animation: stage-pulse 1.6s ease-out infinite;
+}
+.pipeline-row.active .progress {
+  background: color-mix(in oklab, var(--grad-peach) 18%, var(--hairline));
+}
+.pipeline-row.active .progress i {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--grad-peach) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: stage-sweep 1.4s linear infinite;
+  /* Hold a minimum width so the sweep is visible even when fractional
+     progress is still 0 (e.g. crossref pass1 in flight). */
+  min-width: 28%;
+}
+.pipeline-row.active .frac {
+  color: var(--grad-peach);
+  animation: stage-fade 1.6s ease-in-out infinite;
+}
+@keyframes stage-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--grad-peach) 80%, transparent); }
+  70%  { box-shadow: 0 0 0 8px color-mix(in oklab, var(--grad-peach) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--grad-peach) 0%, transparent); }
+}
+@keyframes stage-sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+@keyframes stage-fade {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+.now {
+  position: relative;
+  aspect-ratio: 16/9;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  background: var(--surface-strong);
+}
+.now img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.now.vignette { box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.7); }
+.now .scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--grad-peach), transparent);
+  animation: scan-down 3s linear infinite;
+  pointer-events: none;
+}
+@keyframes scan-down {
+  from { top: 0%; }
+  to { top: 100%; }
+}
+.now .crosshair {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.3;
+  pointer-events: none;
+}
+.now .label {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  font-family: var(--sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--ink);
+  border-radius: 4px;
+}
+.now .meta-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--ink);
+}
+.now .meta-overlay > span {
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+}
+.now-palette {
+  display: flex;
+  gap: 4px;
+  height: 16px;
+  margin-top: 8px;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.now-palette span {
+  flex: 1;
+  border-radius: 4px;
+}
+
+.strip-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.strip-row .lbl {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+}
+.strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-behavior: smooth;
+}
+.cell {
+  flex-shrink: 0;
+  width: 90px;
+  height: 60px;
+  position: relative;
+  background: var(--surface-strong);
+  border-radius: var(--r-1);
+  overflow: hidden;
+  border: 2px solid transparent;
+}
+.cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cell .tc {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-family: var(--sans);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--body);
+  padding: 1px 4px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+}
+.cell.pending {
+  background: var(--canvas-soft);
+}
+.cell.pending .tc { color: var(--muted); }
+.cell.latest { border-color: var(--grad-peach); }
+
+.log-pane {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-2);
+  padding: 16px;
+  font-family: var(--sans);
+  font-size: 12px;
+}
+.log-pane h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 12px;
+  font-family: var(--sans);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.log-pane h3 .live { color: var(--ink); }
+.log-pane .log {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.log-pane .log > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--body);
+}
+.log-pane .t {
+  color: var(--muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.log-pane .lvl {
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+  min-width: 56px;
+}
+.log-pane .lvl.candidate { color: var(--grad-peach); }
+.log-pane .lvl.error { color: var(--error); }
+.log-pane .v { color: var(--body); }
+.log-pane .q { color: var(--body-strong); font-style: italic; }
+
+.candidates-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  /* Cap the column at the viewport so a 30-candidate run scrolls within
+     the lane instead of stretching the page to several screens tall. */
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.candidate-card {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  padding: 14px 16px;
+  border-radius: var(--r-2);
+  opacity: 0;
+  animation: candidate-fade-in 0.4s ease forwards;
+}
+.candidate-card.weak {
+  background: var(--surface-card);
+  border: 1px dashed color-mix(in oklab, var(--grad-sky) 35%, transparent);
+}
+@keyframes candidate-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.candidates-empty {
+  font-family: var(--sans);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.96px;
+  color: var(--muted-soft);
+  text-align: center;
+  padding: 32px 16px;
+}
+.pipeline-footer-slate {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px clamp(32px, 5vw, 64px);
+  background: var(--canvas);
+  border-top: 1px solid var(--hairline);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--muted);
+}
+.pipeline-footer-slate .sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 14px;
+  background: var(--hairline);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .now .scan { animation: none; display: none; }
+  .candidate-card { animation: none; opacity: 1; transform: none; }
+  .pipeline-row.active .pill .num::before,
+  .pipeline-row.active .progress i,
+  .pipeline-row.active .frac { animation: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
    Surface treatments
    ───────────────────────────────────────────────────────────────── */
 
@@ -865,11 +1329,6 @@ html, body {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
   50%  { transform: translate3d(2%, -1.5%, 0) scale(1.04); }
   100% { transform: translate3d(-1.5%, 2%, 0) scale(0.98); }
-}
-
-.surface-dark {
-  background: var(--color-midnight);
-  color: #ffffff;
 }
 
 /* Dark "deep-sky" — used for the report shell */

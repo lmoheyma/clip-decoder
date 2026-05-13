@@ -23,7 +23,16 @@ class EventBus:
     # subscriber. Without this, React batches every state update from
     # the burst into a single render and the pipeline display jumps
     # from empty to "done" with no visible animation.
-    _REPLAY_PACE_S: float = 0.18
+    # Slow pace for transitions (user perceives the pipeline progressing).
+    _REPLAY_PACE_TRANSITION_S: float = 0.18
+    # Fast pace for bursty per-frame/per-candidate events. With ~80
+    # vision_frame events per run, a uniform 0.18s would mean ~14s of
+    # replay on reload-mid-pipeline.
+    _REPLAY_PACE_BURST_S: float = 0.02
+    # Steps that fire in high-volume bursts during a run.
+    _BURST_STEPS: frozenset[str] = frozenset(
+        {"vision_frame", "crossref_candidate"}
+    )
 
     def __init__(self):
         self._queues: dict[str, list[asyncio.Queue[PipelineEvent | None]]] = (
@@ -31,6 +40,15 @@ class EventBus:
         )
         self._history: dict[str, list[PipelineEvent]] = defaultdict(list)
         self._lock = asyncio.Lock()
+
+    def has_history(self, youtube_id: str) -> bool:
+        """Whether the bus has any in-memory events for this id.
+
+        Used by the SSE endpoint to decide whether to fall back to a
+        DB-synthesized terminal event (for analyses whose history was
+        lost across a server restart).
+        """
+        return bool(self._history.get(youtube_id))
 
     async def publish(self, youtube_id: str, event: PipelineEvent) -> None:
         async with self._lock:
@@ -61,7 +79,12 @@ class EventBus:
             for i, ev in enumerate(backlog):
                 yield ev
                 if i < len(backlog) - 1:
-                    await asyncio.sleep(self._REPLAY_PACE_S)
+                    pace = (
+                        self._REPLAY_PACE_BURST_S
+                        if ev.step in self._BURST_STEPS
+                        else self._REPLAY_PACE_TRANSITION_S
+                    )
+                    await asyncio.sleep(pace)
             if terminated:
                 return
             while True:

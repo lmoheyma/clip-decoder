@@ -1,15 +1,51 @@
 from __future__ import annotations
 import asyncio
 import base64
+import contextvars
 import json
 import logging
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+# Per-task sink the orchestrator binds before running the pipeline. When
+# set, NIM transient retries and >=400 responses publish a one-line
+# update through it so the user-visible LogPane shows progress during
+# slow LLM calls instead of staring at a frozen screen.
+_NIM_EVENT_SINK: contextvars.ContextVar[
+    Callable[[str, str], Awaitable[None]] | None
+] = contextvars.ContextVar("_NIM_EVENT_SINK", default=None)
+
+
+def bind_nim_event_sink(
+    sink: Callable[[str, str], Awaitable[None]] | None,
+) -> contextvars.Token:
+    """Bind a sink for NIM client diagnostics in the current async context.
+
+    The sink is invoked with (level, message) where level is one of
+    'retry' / 'error'. Returns a Token the caller passes to
+    `unbind_nim_event_sink` when the scope ends.
+    """
+    return _NIM_EVENT_SINK.set(sink)
+
+
+def unbind_nim_event_sink(token: contextvars.Token) -> None:
+    _NIM_EVENT_SINK.reset(token)
+
+
+async def _emit_nim_event(level: str, message: str) -> None:
+    sink = _NIM_EVENT_SINK.get()
+    if sink is None:
+        return
+    try:
+        await sink(level, message)
+    except Exception:
+        logger.exception("nim event sink raised")
 
 
 class NimError(RuntimeError):
@@ -76,12 +112,22 @@ class NimClient:
                     )
                 except (httpx.ReadTimeout, httpx.ConnectError, httpx.RemoteProtocolError) as e:
                     if attempt >= self._MAX_TRANSIENT_RETRIES:
+                        await _emit_nim_event(
+                            "error",
+                            f"LLM unreachable ({type(e).__name__}) after "
+                            f"{self._MAX_TRANSIENT_RETRIES + 1} attempts",
+                        )
                         raise
                     delay = self._backoff_delay(attempt)
                     logger.warning(
                         "NIM transport error (%s) for model=%r; retry %d/%d in %.1fs",
                         type(e).__name__, model, attempt + 1,
                         self._MAX_TRANSIENT_RETRIES, delay,
+                    )
+                    await _emit_nim_event(
+                        "retry",
+                        f"LLM {type(e).__name__} — retrying "
+                        f"{attempt + 1}/{self._MAX_TRANSIENT_RETRIES} in {delay:.1f}s",
                     )
                     await asyncio.sleep(delay)
                     continue
@@ -92,12 +138,20 @@ class NimClient:
                         r.status_code, model, attempt + 1,
                         self._MAX_TRANSIENT_RETRIES, delay,
                     )
+                    await _emit_nim_event(
+                        "retry",
+                        f"LLM HTTP {r.status_code} — retrying "
+                        f"{attempt + 1}/{self._MAX_TRANSIENT_RETRIES} in {delay:.1f}s",
+                    )
                     await asyncio.sleep(delay)
                     continue
                 if r.status_code >= 400:
                     logger.error(
                         "NIM %s for model=%r: %s",
                         r.status_code, model, r.text[:500],
+                    )
+                    await _emit_nim_event(
+                        "error", f"LLM HTTP {r.status_code}"
                     )
                     r.raise_for_status()
                 data = r.json()

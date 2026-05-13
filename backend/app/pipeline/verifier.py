@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import urllib.parse
+from typing import Awaitable, Callable
 import httpx
 from app.models import (
     Confidence,
@@ -113,12 +114,34 @@ class Verifier:
         self,
         candidates: list[ReferenceCandidate],
         frame_index: dict[str, FrameAnalysis],
+        on_progress: Callable[[str, float], Awaitable[None]] | None = None,
     ) -> list[VerifiedReference]:
         # return_exceptions=True so a single transient failure (e.g. NIM
         # 5xx that exhausted its retries) doesn't drop every successfully
         # verified reference. Failed verifications are logged and skipped.
+        total = len(candidates)
+        completed = 0
+        lock = asyncio.Lock()
+
+        async def _wrapped(c: ReferenceCandidate) -> VerifiedReference:
+            nonlocal completed
+            res = await self._verify_one(c, frame_index)
+            async with lock:
+                completed += 1
+                if on_progress:
+                    # Progress band for verify is 0.75 -> 1.0 (25%); each
+                    # candidate moves us linearly across it.
+                    p = 0.75 + (completed / max(total, 1)) * 0.25
+                    bucket = res.final_confidence.value
+                    await on_progress(
+                        f"Verified {completed}/{total} · "
+                        f"{res.work_title} → {bucket}",
+                        p,
+                    )
+            return res
+
         results = await asyncio.gather(
-            *(self._verify_one(c, frame_index) for c in candidates),
+            *(_wrapped(c) for c in candidates),
             return_exceptions=True,
         )
         verified: list[VerifiedReference] = []
@@ -128,6 +151,10 @@ class Verifier:
                     "verifier failed for candidate %r: %s",
                     cand.work_title, res,
                 )
+                if on_progress:
+                    await on_progress(
+                        f"Verify failed for {cand.work_title}: {res}", 0.0,
+                    )
                 continue
             verified.append(res)
         return verified
