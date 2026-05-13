@@ -253,3 +253,54 @@ async def test_one_ref_fails_others_succeed():
     assert out[0].medium == "oil on canvas"
     assert out[1].medium is None  # the 500
     assert out[2].medium == "oil on canvas"
+
+
+@respx.mock
+async def test_falls_back_to_p577_for_films():
+    # Films/music videos have P577 (publication date) instead of P571
+    # (inception). The enricher should pick up either property.
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        side_effect=[
+            Response(200, json={
+                "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q83495"}}}}
+            }),
+            Response(200, json={"entities": {}}),
+        ]
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q83495.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q83495": {"claims": {
+            "P577": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"time": "+1999-03-31T00:00:00Z"}}}}],
+        }}}
+    }))
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref()])
+    assert out[0].inception_year == 1999
+    assert out[0].medium is None
+    assert out[0].institution is None
+
+
+@respx.mock
+async def test_falls_back_to_p272_for_film_institution():
+    # Films have P272 (production company) where artworks have P276 (location).
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q83495"}}}}
+        })
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q83495.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q83495": {"claims": {
+            "P272": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q42"}}}}],
+        }}}
+    }))
+    respx.get("https://www.wikidata.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "entities": {"Q42": {"labels": {"en": {"value": "Warner Bros."}}}}
+        })
+    )
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref()])
+    assert out[0].institution == "Warner Bros."

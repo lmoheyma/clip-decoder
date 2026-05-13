@@ -149,8 +149,18 @@ class WikidataEnricher:
         if claims is None:
             return r
         medium_qid = self._claim_qid(claims.get("P186", []))
-        institution_qid = self._claim_qid(claims.get("P276", []))
-        inception = self._claim_inception(claims.get("P571", []))
+        # P276 (location) is the institution for artworks. P915 (filming location) and P272
+        # (production company) are film-specific. Try P276 first, fall back to P272.
+        institution_qid = (
+            self._claim_qid(claims.get("P276", []))
+            or self._claim_qid(claims.get("P272", []))
+        )
+        # P571 (inception) covers artworks/organisations. Creative works like films and
+        # music videos use P577 (publication date) instead. Try P571 first, fall back to P577.
+        inception = (
+            self._claim_inception(claims.get("P571", []))
+            or self._claim_inception(claims.get("P577", []))
+        )
         labels_to_resolve = [q for q in (medium_qid, institution_qid) if q]
         labels = await self._resolve_labels(labels_to_resolve) if labels_to_resolve else {}
         return r.model_copy(update={
