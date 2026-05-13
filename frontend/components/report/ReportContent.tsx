@@ -245,6 +245,7 @@ export function ReportContent({
               <ReferenceCard
                 key={`${ref.source_frame_id}-${idx}`}
                 reference={ref}
+                index={idx}
                 paletteHex={paletteHex}
                 paletteDescriptors={paletteDescriptors}
                 youtubeId={report.youtube_id}
