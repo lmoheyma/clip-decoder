@@ -62,7 +62,6 @@ class ReferenceCandidate(BaseModel):
     work_creator: Annotated[str, Field(min_length=1)]
     work_year: int | None = None
     work_type: str  # painting | photograph | music_video | film | album_cover | fashion_editorial | ad_campaign | archival_footage | other
-    reasoning: Annotated[str, Field(min_length=1)]
     raw_confidence: Annotated[float, Field(ge=0.0, le=1.0)]
 
 

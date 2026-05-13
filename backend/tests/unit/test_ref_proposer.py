@@ -28,7 +28,6 @@ async def test_proposes_named_candidates():
                 "work_creator": "Stanley Kubrick",
                 "work_year": 1980,
                 "work_type": "film",
-                "reasoning": "symmetry + corridor + slow track",
                 "raw_confidence": 0.82,
             }
         ]
@@ -54,7 +53,6 @@ async def test_drops_candidates_with_empty_title():
                 "work_title": "",
                 "work_creator": "Someone",
                 "work_type": "film",
-                "reasoning": "x",
                 "raw_confidence": 0.5,
             }
         ]
@@ -90,7 +88,6 @@ async def test_propose_runs_two_passes_with_types_covered():
                     "work_creator": "Stanley Kubrick",
                     "work_year": 1980,
                     "work_type": "film",
-                    "reasoning": "symmetry + corridor + slow track",
                     "raw_confidence": 0.82,
                 }
             ]
@@ -104,7 +101,6 @@ async def test_propose_runs_two_passes_with_types_covered():
                     "work_creator": "Eugène Delacroix",
                     "work_year": 1830,
                     "work_type": "painting",
-                    "reasoning": "central raised figure + flag + smoke",
                     "raw_confidence": 0.7,
                 }
             ]
@@ -137,7 +133,6 @@ async def test_merge_dedups_case_insensitive_pass1_wins():
                 "work_creator": "Dario Argento",
                 "work_year": 1977,
                 "work_type": "film",
-                "reasoning": "red light + symmetric corridor + ornate set",
                 "raw_confidence": 0.85,
             }
         ]
@@ -152,7 +147,6 @@ async def test_merge_dedups_case_insensitive_pass1_wins():
                 "work_creator": "dario argento",
                 "work_year": 1977,
                 "work_type": "film",
-                "reasoning": "red palette + dance studio + neon",
                 "raw_confidence": 0.4,
             }
         ]
@@ -184,7 +178,6 @@ async def test_pass2_failure_returns_pass1_only(caplog):
                     "work_creator": "Andrei Tarkovsky",
                     "work_year": 1972,
                     "work_type": "film",
-                    "reasoning": "long static interior + reflective surface + somber palette",
                     "raw_confidence": 0.7,
                 }
             ]
@@ -218,7 +211,6 @@ async def test_pass1_empty_pass2_still_runs_permissive():
                     "work_creator": "Chris Burden",
                     "work_year": 1974,
                     "work_type": "other",
-                    "reasoning": "outstretched figure + cruciform pose + harsh ground",
                     "raw_confidence": 0.55,
                 }
             ]
@@ -244,12 +236,12 @@ async def test_on_candidate_callback_called_for_each_merged_candidate(monkeypatc
         ReferenceCandidate(
             timestamp_s=10.0, source_frame_id="shot_01",
             work_title="A", work_creator="X", work_year=2000,
-            work_type="painting", reasoning="r", raw_confidence=0.8,
+            work_type="painting", raw_confidence=0.8,
         ),
         ReferenceCandidate(
             timestamp_s=20.0, source_frame_id="shot_02",
             work_title="B", work_creator="Y", work_year=2001,
-            work_type="film", reasoning="r", raw_confidence=0.7,
+            work_type="film", raw_confidence=0.7,
         ),
     ]
 
