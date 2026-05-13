@@ -206,3 +206,50 @@ async def test_skips_refs_without_wikipedia_url():
     assert out[0].medium is None
     assert out[0].institution is None
     assert out[0].inception_year is None
+
+
+@respx.mock
+async def test_one_ref_fails_others_succeed():
+    # Three refs, three pageprops calls. Second one returns a 500.
+    page_responses = [
+        Response(200, json={"query": {"pages": {"1": {"pageprops": {"wikibase_item": "Q1"}}}}}),
+        Response(500),
+        Response(200, json={"query": {"pages": {"3": {"pageprops": {"wikibase_item": "Q3"}}}}}),
+    ]
+    respx.get("https://en.wikipedia.org/w/api.php").mock(side_effect=page_responses + [
+        # wbgetentities for Q1's claim QIDs and Q3's claim QIDs (both same dummy Q300)
+        Response(200, json={"entities": {"Q300": {"labels": {"en": {"value": "oil on canvas"}}}}}),
+        Response(200, json={"entities": {"Q300": {"labels": {"en": {"value": "oil on canvas"}}}}}),
+    ])
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q1.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q1": {"claims": {
+            "P186": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q300"}}}}],
+        }}}
+    }))
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q3.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q3": {"claims": {
+            "P186": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q300"}}}}],
+        }}}
+    }))
+    # Also mock wikidata.org/w/api.php for wbgetentities calls
+    respx.get("https://www.wikidata.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "entities": {"Q300": {"labels": {"en": {"value": "oil on canvas"}}}},
+        })
+    )
+    refs = [
+        _ref(wiki_url="https://en.wikipedia.org/wiki/Foo"),
+        _ref(wiki_url="https://en.wikipedia.org/wiki/Bar"),
+        _ref(wiki_url="https://en.wikipedia.org/wiki/Baz"),
+    ]
+    # Use concurrency=1 to force a deterministic order matching page_responses.
+    enricher = WikidataEnricher(concurrency=1)
+    out = await enricher.enrich(refs)
+    assert len(out) == 3
+    assert out[0].medium == "oil on canvas"
+    assert out[1].medium is None  # the 500
+    assert out[2].medium == "oil on canvas"
