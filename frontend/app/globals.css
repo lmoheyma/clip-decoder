@@ -112,6 +112,34 @@ html, body {
   text-rendering: optimizeLegibility;
 }
 
+/* Editorial scrollbar — slim, warm-tone, peach-on-hover. Applies to
+   any scrollable surface (page chrome, log panes, candidates lane). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--grad-peach);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ─────────────────────────────────────────────────────────────────
    SP1 — Component primitives (editorial register).
    Slate, buttons, chips, kbd, type primitives.
@@ -944,6 +972,63 @@ html, body {
 .pipeline-row:not(.done):not(.active):not(.error) .pill em { color: var(--muted); }
 .pipeline-row:not(.done):not(.active):not(.error) .pill .num { color: var(--muted-soft); }
 
+/* Active-stage motion — peach pulse on the num + a sweeping bar on the
+   progress lane. Borrows the scan/peach motif from NowFrame so the
+   pipeline list reads as part of the same instrument, not a generic
+   loading spinner. The sweep runs even when progress fraction is 0
+   (e.g. while the LLM is thinking) so the user always sees something
+   alive. */
+.pipeline-row.active .pill .num {
+  color: var(--grad-peach);
+  position: relative;
+}
+.pipeline-row.active .pill .num::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: var(--grad-peach);
+  box-shadow: 0 0 0 0 var(--grad-peach);
+  animation: stage-pulse 1.6s ease-out infinite;
+}
+.pipeline-row.active .progress {
+  background: color-mix(in oklab, var(--grad-peach) 18%, var(--hairline));
+}
+.pipeline-row.active .progress i {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--grad-peach) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: stage-sweep 1.4s linear infinite;
+  /* Hold a minimum width so the sweep is visible even when fractional
+     progress is still 0 (e.g. crossref pass1 in flight). */
+  min-width: 28%;
+}
+.pipeline-row.active .frac {
+  color: var(--grad-peach);
+  animation: stage-fade 1.6s ease-in-out infinite;
+}
+@keyframes stage-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--grad-peach) 80%, transparent); }
+  70%  { box-shadow: 0 0 0 8px color-mix(in oklab, var(--grad-peach) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--grad-peach) 0%, transparent); }
+}
+@keyframes stage-sweep {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+@keyframes stage-fade {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
 .now {
   position: relative;
   aspect-ratio: 16/9;
@@ -1144,6 +1229,11 @@ html, body {
   flex-direction: column;
   gap: 10px;
   flex: 1;
+  /* Cap the column at the viewport so a 30-candidate run scrolls within
+     the lane instead of stretching the page to several screens tall. */
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .candidate-card {
   background: var(--surface-card);
@@ -1170,19 +1260,6 @@ html, body {
   text-align: center;
   padding: 32px 16px;
 }
-.candidates-footer {
-  margin-top: auto;
-  border-top: 1px solid var(--hairline);
-  padding-top: 14px;
-}
-.candidates-footer-body {
-  font-family: var(--sans);
-  font-size: 13px;
-  color: var(--body);
-  line-height: 1.6;
-  margin-top: 8px;
-}
-
 .pipeline-footer-slate {
   display: flex;
   align-items: center;
@@ -1204,6 +1281,9 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .now .scan { animation: none; display: none; }
   .candidate-card { animation: none; opacity: 1; transform: none; }
+  .pipeline-row.active .pill .num::before,
+  .pipeline-row.active .progress i,
+  .pipeline-row.active .frac { animation: none; }
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -1249,11 +1329,6 @@ html, body {
   0%   { transform: translate3d(0, 0, 0) scale(1); }
   50%  { transform: translate3d(2%, -1.5%, 0) scale(1.04); }
   100% { transform: translate3d(-1.5%, 2%, 0) scale(0.98); }
-}
-
-.surface-dark {
-  background: var(--color-midnight);
-  color: #ffffff;
 }
 
 /* Dark "deep-sky" — used for the report shell */

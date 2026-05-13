@@ -57,14 +57,6 @@ export function CandidatesPane({ events }: { events: PipelineEvent[] }) {
             </div>
           ))
         )}
-
-        <div className="candidates-footer">
-          <div className="hairline">You can close this tab</div>
-          <div className="candidates-footer-body">
-            Analysis runs server-side. Bookmark the report URL — it&apos;ll fill in
-            as the pipeline finishes.
-          </div>
-        </div>
       </div>
     </>
   );
