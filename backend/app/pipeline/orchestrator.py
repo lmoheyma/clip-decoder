@@ -9,6 +9,7 @@ from app.pipeline.ingestor import Ingestor
 from app.pipeline.ref_proposer import RefProposer
 from app.pipeline.shot_sampler import ShotSampler
 from app.pipeline.verifier import Verifier
+from app.pipeline.wikidata_enricher import WikidataEnricher
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class Orchestrator:
         frame_analyzer: FrameAnalyzer,
         ref_proposer: RefProposer,
         verifier: Verifier,
+        enricher: WikidataEnricher | None = None,
     ):
         self._db = db
         self._bus = bus
@@ -32,6 +34,7 @@ class Orchestrator:
         self._frame_analyzer = frame_analyzer
         self._ref_proposer = ref_proposer
         self._verifier = verifier
+        self._enricher = enricher
 
     async def _emit(
         self, youtube_id: str, step: str, message: str, progress: float = 0.0,
@@ -168,7 +171,28 @@ class Orchestrator:
             verified = await self._verifier.verify_all(
                 candidates, frame_index, on_progress=_on_verify_progress,
             )
-            kept = [v for v in verified if v.final_confidence.value != "hidden"]
+
+            if self._enricher is not None:
+                await self._emit(
+                    yid, "verify",
+                    f"Enriching {len(verified)} with Wikidata",
+                    0.95,
+                )
+                try:
+                    enriched = await self._enricher.enrich(
+                        verified, on_progress=_on_verify_progress,
+                    )
+                except Exception:
+                    logger.exception("wikidata enrichment failed")
+                    enriched = verified
+            else:
+                enriched = verified
+
+            # Stable visual order: report.references[n] must match the n-th
+            # card on the report grid (which sorts by timestamp_s at render).
+            enriched.sort(key=lambda r: r.timestamp_s)
+
+            kept = [v for v in enriched if v.final_confidence.value != "hidden"]
 
             report = Report(
                 youtube_id=yid,

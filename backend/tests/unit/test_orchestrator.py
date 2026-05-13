@@ -13,6 +13,7 @@ from app.models import (
 )
 from app.pipeline.orchestrator import Orchestrator
 from app.db import Database, AnalysisStatus
+from app.pipeline.wikidata_enricher import WikidataEnricher
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +53,7 @@ def _make_orchestrator(tmp_path: Path, *, keyframes, fa_results, candidates):
     frame_analyzer.analyze = _analyze
 
     # ref_proposer.propose must actually call on_candidate for each candidate.
-    async def _propose(*, title, channel, lyrics_text, frame_analyses, on_candidate=None):
+    async def _propose(*, title, channel, lyrics_text, frame_analyses, on_candidate=None, on_progress=None):
         for c in candidates:
             if on_candidate:
                 await on_candidate(c)
@@ -69,6 +70,9 @@ def _make_orchestrator(tmp_path: Path, *, keyframes, fa_results, candidates):
             final_confidence=Confidence.CONFIRMED,
             supporting_elements=["a"],
             wikipedia_url=None,
+            cross_ref_reasoning="cr",
+            adversarial_reasoning="ad",
+            wikipedia_reasoning="wk",
         )
     ] if candidates else []
 
@@ -180,6 +184,9 @@ async def test_full_pipeline_emits_events_and_saves(tmp_path: Path):
             final_confidence=Confidence.CONFIRMED,
             supporting_elements=["x", "y", "z"],
             wikipedia_url="https://en.wikipedia.org/wiki/The_Shining",
+            cross_ref_reasoning="cr",
+            adversarial_reasoning="ad",
+            wikipedia_reasoning="wk",
         )
     ]
 
@@ -275,3 +282,136 @@ async def test_vision_frame_events_emitted_per_frame(tmp_path: Path):
         assert "composition" in p, f"composition missing: {p}"
         assert "palette_hex" in p, f"palette_hex missing: {p}"
         assert 1 <= p["shot_index"] <= p["total_shots"]
+
+
+async def test_orchestrator_emits_enrich_step_and_uses_enriched_refs(tmp_path: Path):
+    keyframes, fa_results, candidates = _default_fixtures(tmp_path)
+
+    verifier = AsyncMock()
+    verified_ref = VerifiedReference(
+        **candidates[0].model_dump(),
+        verdict=Verdict.KEEP,
+        final_confidence=Confidence.CONFIRMED,
+        supporting_elements=["a"],
+        wikipedia_url="https://en.wikipedia.org/wiki/The_Shining",
+        cross_ref_reasoning="cr",
+        adversarial_reasoning="ad",
+        wikipedia_reasoning="wk",
+    )
+    verifier.verify_all.return_value = [verified_ref]
+
+    enricher = AsyncMock()
+    enricher.enrich.return_value = [
+        verified_ref.model_copy(update={
+            "medium": "celluloid",
+            "institution": "Warner Bros.",
+            "inception_year": 1980,
+        })
+    ]
+
+    db_mock = AsyncMock()
+    db_mock.get_status = AsyncMock(return_value=AnalysisStatus.DONE)
+    db_mock.save_report = AsyncMock()
+    db_mock.set_status = AsyncMock()
+    bus = EventBus()
+
+    ingestor = MagicMock()
+    ingestor.ingest.return_value = IngestResult(
+        youtube_id="abc", video_path=tmp_path / "v.mp4",
+        title="t", channel="c", duration_s=10.0, captions=[],
+    )
+    sampler = MagicMock()
+    sampler.sample.return_value = keyframes
+
+    async def _analyze(kfs, on_frame=None):
+        return fa_results
+    frame_analyzer = MagicMock()
+    frame_analyzer.analyze = _analyze
+
+    async def _propose(*, title, channel, lyrics_text, frame_analyses, on_candidate=None, on_progress=None):
+        return candidates
+    proposer = MagicMock()
+    proposer.propose = _propose
+
+    orch = Orchestrator(
+        db=db_mock, bus=bus,
+        ingestor=ingestor, sampler=sampler,
+        frame_analyzer=frame_analyzer,
+        ref_proposer=proposer, verifier=verifier,
+        enricher=enricher,
+    )
+
+    received: list = []
+    async def collect():
+        async for ev in bus.subscribe("abc"):
+            received.append(ev)
+            if ev.step == "done":
+                break
+
+    consumer = asyncio.create_task(collect())
+    await orch.run("https://www.youtube.com/watch?v=abc")
+    await asyncio.wait_for(consumer, timeout=2.0)
+
+    verify_msgs = [e.message for e in received if e.step == "verify"]
+    assert any("Enriching" in m for m in verify_msgs), (
+        f"No 'Enriching' verify event found: {verify_msgs}"
+    )
+
+    saved_report = db_mock.save_report.call_args.args[0]
+    assert saved_report.references[0].medium == "celluloid"
+    assert saved_report.references[0].institution == "Warner Bros."
+    assert saved_report.references[0].inception_year == 1980
+
+
+async def test_orchestrator_continues_when_enricher_raises(tmp_path: Path):
+    keyframes, fa_results, candidates = _default_fixtures(tmp_path)
+    verifier = AsyncMock()
+    verified_ref = VerifiedReference(
+        **candidates[0].model_dump(),
+        verdict=Verdict.KEEP,
+        final_confidence=Confidence.CONFIRMED,
+        supporting_elements=["a"],
+        wikipedia_url=None,
+        cross_ref_reasoning="cr",
+        adversarial_reasoning="ad",
+        wikipedia_reasoning="wk",
+    )
+    verifier.verify_all.return_value = [verified_ref]
+    enricher = AsyncMock()
+    enricher.enrich.side_effect = RuntimeError("wikidata down")
+
+    db_mock = AsyncMock()
+    db_mock.get_status = AsyncMock(return_value=AnalysisStatus.DONE)
+    db_mock.save_report = AsyncMock()
+    db_mock.set_status = AsyncMock()
+    bus = EventBus()
+    ingestor = MagicMock()
+    ingestor.ingest.return_value = IngestResult(
+        youtube_id="abc", video_path=tmp_path / "v.mp4",
+        title="t", channel="c", duration_s=10.0, captions=[],
+    )
+    sampler = MagicMock(); sampler.sample.return_value = keyframes
+    async def _analyze(kfs, on_frame=None): return fa_results
+    frame_analyzer = MagicMock(); frame_analyzer.analyze = _analyze
+    async def _propose(**kw): return candidates
+    proposer = MagicMock(); proposer.propose = _propose
+
+    orch = Orchestrator(
+        db=db_mock, bus=bus,
+        ingestor=ingestor, sampler=sampler,
+        frame_analyzer=frame_analyzer,
+        ref_proposer=proposer, verifier=verifier,
+        enricher=enricher,
+    )
+
+    async def collect():
+        async for ev in bus.subscribe("abc"):
+            if ev.step == "done":
+                return
+    consumer = asyncio.create_task(collect())
+    await orch.run("https://www.youtube.com/watch?v=abc")
+    await asyncio.wait_for(consumer, timeout=2.0)
+
+    saved_report = db_mock.save_report.call_args.args[0]
+    # graceful degrade: references saved with unrelated fields intact
+    assert saved_report.references[0].medium is None
