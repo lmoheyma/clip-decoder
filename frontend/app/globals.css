@@ -1573,3 +1573,227 @@ html, body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   SP4 — Reference detail page (frame 04 of the mockup).
+   ───────────────────────────────────────────────────────────────── */
+
+.detail {
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 24px;
+  padding: clamp(32px, 4vw, 56px) clamp(32px, 5vw, 64px);
+}
+
+.detail-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+}
+.detail-top h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-style: italic;
+  font-size: clamp(36px, 4vw, 48px);
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: var(--ink);
+}
+.detail-top h1 .by {
+  font-style: normal;
+  color: var(--body);
+}
+.detail-top-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.detail-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .detail-compare { grid-template-columns: 1fr; }
+}
+.detail-pane {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-2);
+  overflow: hidden;
+}
+.detail-pane .img {
+  aspect-ratio: 16/9;
+  background: #000;
+  position: relative;
+  overflow: hidden;
+}
+.detail-pane .img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.detail-pane.placeholder .img {
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 12px),
+    linear-gradient(135deg, #1a1612 0%, #25201b 100%);
+  display: grid;
+  place-items: center;
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: 0.96px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.detail-pane .body { padding: 14px 18px; }
+.detail-pane .body .lbl {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.96px;
+  text-transform: uppercase;
+  color: var(--grad-peach);
+  margin-bottom: 6px;
+}
+.detail-pane .body .ttl {
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.detail-pane .body .ttl.serif-it {
+  font-style: italic;
+}
+.detail-pane .body .sub {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--body);
+  margin-top: 4px;
+}
+
+.detail-evidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .detail-evidence { grid-template-columns: 1fr; }
+}
+.detail-reasoning,
+.detail-frame-analysis {
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-2);
+  padding: 22px 24px;
+}
+.detail-reasoning .h,
+.detail-frame-analysis .h {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.detail-reasoning .pull-quote {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--ink);
+  border-left: 2px solid var(--grad-peach);
+  padding-left: 16px;
+  margin: 0 0 18px;
+}
+.detail-reasoning p {
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--body-strong);
+  margin: 0 0 14px;
+}
+.detail-reasoning p .label {
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--ink);
+  margin-right: 4px;
+}
+
+.detail-frame-analysis dl {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+.detail-frame-analysis dt {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.96px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.detail-frame-analysis dd {
+  margin: 2px 0 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.detail-frame-analysis .palette-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.detail-frame-analysis .palette-row .swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.detail-frame-analysis .palette-row .label {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* DetailSlate — extends .slate with a focus position chip and PREV/NEXT/ESC links. */
+.detail-slate .nav-link {
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: 0.96px;
+  text-transform: uppercase;
+  color: var(--body);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--hairline);
+}
+.detail-slate .nav-link:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.detail-slate .nav-link.disabled {
+  color: var(--muted-soft);
+  border-color: var(--hairline);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ReferenceCard — the Link wrap needs to be display:contents so the
+   existing flex layout of .ref keeps working. */
+.ref .ref-link {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+.ref .ref-link:focus-visible {
+  outline: 2px solid var(--grad-peach);
+  outline-offset: 4px;
+  border-radius: var(--r-2);
+}
