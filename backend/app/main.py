@@ -15,6 +15,7 @@ from app.pipeline.orchestrator import Orchestrator
 from app.pipeline.ref_proposer import RefProposer
 from app.pipeline.shot_sampler import ShotSampler
 from app.pipeline.verifier import Verifier
+from app.pipeline.wikidata_enricher import WikidataEnricher
 from app.settings import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +59,14 @@ def _build_default_app() -> FastAPI:
     nim = NimClient(api_key=settings.nvapi_key, base_url=settings.nim_base_url)
     work_dir = settings.data_dir / "downloads"
     frames_dir = settings.data_dir / "frames"
+    enricher = (
+        WikidataEnricher(
+            concurrency=settings.wikidata_concurrency,
+            timeout_s=settings.wikidata_timeout_s,
+        )
+        if settings.wikidata_enrichment
+        else None
+    )
     orch = Orchestrator(
         db=db, bus=bus,
         ingestor=Ingestor(work_dir=work_dir),
@@ -78,6 +87,7 @@ def _build_default_app() -> FastAPI:
             wikipedia=settings.wikipedia_verification,
             concurrency=settings.nim_concurrency,
         ),
+        enricher=enricher,
     )
     return build_app(db=db, bus=bus, run_pipeline=orch.run)
 

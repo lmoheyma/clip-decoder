@@ -31,6 +31,9 @@ def sample_report() -> Report:
                 verdict=Verdict.KEEP,
                 final_confidence=Confidence.CONFIRMED,
                 supporting_elements=["symmetry"],
+                cross_ref_reasoning="matched_metadata",
+                adversarial_reasoning="no_counterexample",
+                wikipedia_reasoning="summary_aligned",
             )
         ],
         frame_analyses=[],

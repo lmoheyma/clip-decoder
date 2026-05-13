@@ -72,6 +72,9 @@ async def test_get_report_returns_payload(client):
                 reasoning="r", raw_confidence=0.5,
                 verdict=Verdict.KEEP, final_confidence=Confidence.CONFIRMED,
                 supporting_elements=[],
+                cross_ref_reasoning="matched",
+                adversarial_reasoning="none",
+                wikipedia_reasoning="aligned",
             )
         ],
         frame_analyses=[],
