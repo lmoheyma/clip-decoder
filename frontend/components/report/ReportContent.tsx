@@ -55,6 +55,28 @@ export function ReportContent({
     }
   }, [stats, selectedTypes.size]);
 
+  // SP4 — hash-based seek. When the user lands on /report/{id}#t=42.5
+  // (typically returning from a reference detail page's JUMP action),
+  // seek the embedded player to that timestamp once it has mounted,
+  // then clear the hash so a future share/copy of the URL does not
+  // re-seek silently.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = window.location.hash.match(/^#t=(\d+(?:\.\d+)?)$/);
+    if (!m) return;
+    const t = Number.parseFloat(m[1]);
+    if (Number.isNaN(t)) return;
+    const timer = setTimeout(() => {
+      playerRef.current?.seekTo(t);
+      history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [report]);
+
   const frameById = useMemo(() => {
     const m = new Map<string, FrameAnalysis>();
     for (const f of report.frame_analyses) m.set(f.frame_id, f);
