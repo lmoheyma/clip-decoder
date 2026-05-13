@@ -34,8 +34,12 @@ export function ReferenceDetail({
   function handleJump() {
     router.push(`/report/${youtubeId}#t=${reference.timestamp_s}`);
   }
-  async function handleFlag() {
-    await flagReference(youtubeId, index);
+  function handleFlag() {
+    // Fire-and-forget with a logged catch so a network blip does not
+    // crash the page. A proper toast layer is SP5 territory.
+    flagReference(youtubeId, index).catch((err) => {
+      console.error("flagReference failed", err);
+    });
   }
 
   return (

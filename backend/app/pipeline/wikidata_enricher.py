@@ -98,10 +98,10 @@ class WikidataEnricher:
         completed = 0
         lock = asyncio.Lock()
 
-        async def _wrapped(idx: int, r: VerifiedReference) -> VerifiedReference:
+        async def _wrapped(http: httpx.AsyncClient, r: VerifiedReference) -> VerifiedReference:
             nonlocal completed
             try:
-                out = await self._enrich_one(r)
+                out = await self._enrich_one(http, r)
             except Exception as e:  # noqa: BLE001 — final safety net per spec
                 logger.warning(
                     "wikidata enrichment failed for %r: %s",
@@ -126,26 +126,28 @@ class WikidataEnricher:
             timeout=self._timeout,
             headers={"User-Agent": WIKI_USER_AGENT},
         ) as http:
-            self._http = http  # noqa: SLF001 — share the client for the run
+            # http is passed through every helper so two concurrent enrich()
+            # calls on the same enricher instance can't collide on shared state.
             results = await asyncio.gather(
-                *(self._sem_wrap(_wrapped(i, r)) for i, r in enumerate(refs)),
+                *(self._sem_wrap(_wrapped(http, r)) for r in refs),
                 return_exceptions=False,
             )
-            self._http = None  # type: ignore[assignment]
         return list(results)
 
     async def _sem_wrap(self, coro: Awaitable[VerifiedReference]) -> VerifiedReference:
         async with self._sem:
             return await coro
 
-    async def _enrich_one(self, r: VerifiedReference) -> VerifiedReference:
+    async def _enrich_one(
+        self, http: httpx.AsyncClient, r: VerifiedReference
+    ) -> VerifiedReference:
         slug = _extract_slug(r.wikipedia_url)
         if slug is None:
             return r
-        qid = await self._fetch_qid(slug)
+        qid = await self._fetch_qid(http, slug)
         if qid is None:
             return r
-        claims = await self._fetch_claims(qid)
+        claims = await self._fetch_claims(http, qid)
         if claims is None:
             return r
         medium_qid = self._claim_qid(claims.get("P186", []))
@@ -162,15 +164,19 @@ class WikidataEnricher:
             or self._claim_inception(claims.get("P577", []))
         )
         labels_to_resolve = [q for q in (medium_qid, institution_qid) if q]
-        labels = await self._resolve_labels(labels_to_resolve) if labels_to_resolve else {}
+        labels = (
+            await self._resolve_labels(http, labels_to_resolve)
+            if labels_to_resolve
+            else {}
+        )
         return r.model_copy(update={
             "medium": labels.get(medium_qid) if medium_qid else None,
             "institution": labels.get(institution_qid) if institution_qid else None,
             "inception_year": inception,
         })
 
-    async def _fetch_qid(self, slug: str) -> str | None:
-        r = await self._http.get(_WIKIPEDIA_API, params={
+    async def _fetch_qid(self, http: httpx.AsyncClient, slug: str) -> str | None:
+        r = await http.get(_WIKIPEDIA_API, params={
             "action": "query",
             "prop": "pageprops",
             "ppprop": "wikibase_item",
@@ -187,8 +193,10 @@ class WikidataEnricher:
                 return qid
         return None
 
-    async def _fetch_claims(self, qid: str) -> dict[str, list] | None:
-        r = await self._http.get(_WIKIDATA_ENTITY.format(qid=qid))
+    async def _fetch_claims(
+        self, http: httpx.AsyncClient, qid: str
+    ) -> dict[str, list] | None:
+        r = await http.get(_WIKIDATA_ENTITY.format(qid=qid))
         if r.status_code != 200:
             return None
         entities = (r.json().get("entities") or {})
@@ -214,10 +222,12 @@ class WikidataEnricher:
             return None
         return _parse_inception_year(time_value)
 
-    async def _resolve_labels(self, qids: list[str]) -> dict[str, str]:
+    async def _resolve_labels(
+        self, http: httpx.AsyncClient, qids: list[str]
+    ) -> dict[str, str]:
         if not qids:
             return {}
-        r = await self._http.get(_WIKIDATA_API, params={
+        r = await http.get(_WIKIDATA_API, params={
             "action": "wbgetentities",
             "ids": "|".join(qids),
             "props": "labels",
