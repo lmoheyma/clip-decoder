@@ -42,7 +42,7 @@ export async function flagReference(
 export function subscribePipeline(
   youtubeId: string,
   onEvent: (e: PipelineEvent) => void,
-  onError?: (err: unknown) => void,
+  onError?: (message: string) => void,
 ): () => void {
   const es = new EventSource(`/api/stream/${encodeURIComponent(youtubeId)}`);
   // Steps that map to named SSE events emitted by the backend.
@@ -61,6 +61,12 @@ export function subscribePipeline(
   // full history. Without this Set, every reconnect duplicates log lines
   // and candidate cards in the UI.
   const seen = new Set<string>();
+  // After we receive a terminal `done` or `error` event we close the
+  // EventSource ourselves — that close() then fires onerror with
+  // readyState=CLOSED, which would otherwise clobber the real error
+  // message with a generic "connection lost" string. Track that we
+  // closed deliberately so onerror can ignore it.
+  let terminated = false;
   function eventKey(e: PipelineEvent): string {
     const p = e.payload as Record<string, unknown>;
     const id =
@@ -78,12 +84,31 @@ export function subscribePipeline(
         if (seen.has(key)) return;
         seen.add(key);
         onEvent(data);
-        if (data.step === "done" || data.step === "error") es.close();
+        if (data.step === "done" || data.step === "error") {
+          terminated = true;
+          es.close();
+        }
       } catch (err) {
-        onError?.(err);
+        onError?.(
+          err instanceof Error ? err.message : "Malformed pipeline event",
+        );
       }
     });
   }
-  es.onerror = (err) => onError?.(err);
-  return () => es.close();
+  // EventSource's onerror fires on transient drops (browser auto-retries)
+  // AND on permanent failures. We only surface a user-visible error when
+  // the connection is permanently closed — otherwise the browser is just
+  // reconnecting and we'd flash bogus errors for routine network blips.
+  es.onerror = () => {
+    if (terminated) return;
+    if (es.readyState === EventSource.CLOSED) {
+      onError?.(
+        "Connection to the pipeline stream was lost before it finished.",
+      );
+    }
+  };
+  return () => {
+    terminated = true;
+    es.close();
+  };
 }

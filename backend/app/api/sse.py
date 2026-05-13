@@ -41,6 +41,15 @@ class EventBus:
         self._history: dict[str, list[PipelineEvent]] = defaultdict(list)
         self._lock = asyncio.Lock()
 
+    def has_history(self, youtube_id: str) -> bool:
+        """Whether the bus has any in-memory events for this id.
+
+        Used by the SSE endpoint to decide whether to fall back to a
+        DB-synthesized terminal event (for analyses whose history was
+        lost across a server restart).
+        """
+        return bool(self._history.get(youtube_id))
+
     async def publish(self, youtube_id: str, event: PipelineEvent) -> None:
         async with self._lock:
             history = self._history[youtube_id]

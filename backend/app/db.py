@@ -69,6 +69,24 @@ class Database:
         async with self._engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+    async def mark_orphans_as_error(self, message: str) -> int:
+        """Mark any rows stuck in RUNNING (server died mid-pipeline) as ERROR.
+
+        Returns the number of rows updated. Called on startup so the
+        frontend's pipeline page doesn't hang on a permanently-idle SSE
+        stream for an analysis whose orchestrator is no longer alive.
+        """
+        from sqlalchemy import update
+        async with self._session() as s:
+            stmt = (
+                update(AnalysisRow)
+                .where(AnalysisRow.status == AnalysisStatus.RUNNING.value)
+                .values(status=AnalysisStatus.ERROR.value, error=message)
+            )
+            result = await s.execute(stmt)
+            await s.commit()
+            return result.rowcount or 0
+
     async def set_status(
         self, youtube_id: str, status: AnalysisStatus, error: str | None = None
     ) -> None:
@@ -86,6 +104,11 @@ class Database:
         async with self._session() as s:
             row = await s.get(AnalysisRow, youtube_id)
             return AnalysisStatus(row.status) if row else None
+
+    async def get_error(self, youtube_id: str) -> str | None:
+        async with self._session() as s:
+            row = await s.get(AnalysisRow, youtube_id)
+            return row.error if row else None
 
     async def save_report(self, report: Report, status: AnalysisStatus) -> None:
         async with self._session() as s:

@@ -34,7 +34,7 @@ export default function Page() {
           }
           if (e.step === "error") setError(e.message);
         },
-        (err) => !cancelled && setError(String(err)),
+        (msg) => !cancelled && setError(msg),
       );
     }
     void load();

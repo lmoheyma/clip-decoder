@@ -48,7 +48,8 @@ class Orchestrator:
             ingest = self._ingestor.ingest(url)
         except Exception as e:
             logger.exception("ingest failed")
-            await self._emit("unknown", "error", str(e), progress=0.0)
+            msg = str(e) or type(e).__name__
+            await self._emit("unknown", "error", msg, progress=0.0)
             return
 
         yid = ingest.youtube_id
@@ -165,5 +166,6 @@ class Orchestrator:
             )
         except Exception as e:
             logger.exception("pipeline failed")
-            await self._db.set_status(yid, AnalysisStatus.ERROR, error=str(e))
-            await self._emit(yid, "error", str(e), progress=0.0)
+            msg = str(e) or type(e).__name__
+            await self._db.set_status(yid, AnalysisStatus.ERROR, error=msg)
+            await self._emit(yid, "error", msg, progress=0.0)

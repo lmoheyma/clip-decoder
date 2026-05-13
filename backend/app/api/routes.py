@@ -99,8 +99,31 @@ def build_router(
     @router.get("/stream/{youtube_id}")
     async def stream(youtube_id: str):
         async def gen():
+            # If the orchestrator is no longer alive for this id (server
+            # restarted after the run finished or errored, or this id was
+            # never run in the current process), the in-memory bus has no
+            # history and bus.subscribe would block forever. Synthesize a
+            # terminal event from the DB instead so the frontend resolves.
+            if not bus.has_history(youtube_id):
+                status = await db.get_status(youtube_id)
+                if status in (AnalysisStatus.DONE, AnalysisStatus.ERROR):
+                    from app.models import PipelineEvent
+
+                    if status == AnalysisStatus.ERROR:
+                        err = await db.get_error(youtube_id) or "Pipeline failed."
+                        ev = PipelineEvent(
+                            step="error", message=err, progress=0.0, payload={}
+                        )
+                    else:
+                        ev = PipelineEvent(
+                            step="done", message="Done.", progress=1.0, payload={}
+                        )
+                    yield {"event": ev.step, "data": ev.model_dump_json()}
+                    return
+
             async for ev in bus.subscribe(youtube_id):
                 yield {"event": ev.step, "data": ev.model_dump_json()}
+
         return EventSourceResponse(gen())
 
     return router
