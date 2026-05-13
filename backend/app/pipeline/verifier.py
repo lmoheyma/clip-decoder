@@ -39,8 +39,14 @@ class Verifier:
 
     async def _wiki_lookup(
         self, work_title: str
-    ) -> tuple[str | None, str | None]:
-        """Return (page_url, thumbnail_url). Both None if the article is missing."""
+    ) -> tuple[str | None, str | None, str]:
+        """Return (page_url, thumbnail_url, summary_extract).
+
+        page_url/thumbnail_url are None when the article does not exist.
+        summary_extract is "" on any failure or when Wikipedia returns no
+        extract; that empty string is what we pass to the verifier prompt
+        as the {wikipedia_summary} placeholder substrate.
+        """
         slug = urllib.parse.quote(work_title.replace(" ", "_"))
         async with httpx.AsyncClient(
             timeout=10.0,
@@ -49,16 +55,17 @@ class Verifier:
             try:
                 r = await http.get(WIKI_SUMMARY_URL.format(slug=slug))
             except httpx.HTTPError:
-                return None, None
+                return None, None, ""
             if r.status_code != 200:
-                return None, None
+                return None, None, ""
             data = r.json()
             try:
                 page_url = data["content_urls"]["desktop"]["page"]
             except (KeyError, TypeError):
-                return None, None
+                return None, None, ""
             thumb_url = (data.get("thumbnail") or {}).get("source")
-            return page_url, thumb_url
+            summary = data.get("extract", "") or ""
+            return page_url, thumb_url, summary
 
     def _bucket(self, verdict: Verdict, wiki_url: str | None) -> Confidence:
         if verdict is Verdict.REJECT:

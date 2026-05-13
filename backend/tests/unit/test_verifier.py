@@ -140,3 +140,40 @@ async def test_wikipedia_thumb_none_when_absent():
     result = await v.verify(_candidate(), {f.frame_id: f for f in [_fa()]})
     assert result.wikipedia_url is not None
     assert result.wikipedia_thumbnail_url is None
+
+
+@respx.mock
+async def test_wiki_lookup_returns_summary_extract():
+    nim = AsyncMock()
+    v = Verifier(nim_client=nim, model="m", wikipedia=True)
+    respx.get(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/The_Shining"
+    ).mock(
+        return_value=Response(
+            200,
+            json={
+                "extract": "The Shining is a 1980 horror film directed by Stanley Kubrick.",
+                "content_urls": {
+                    "desktop": {"page": "https://en.wikipedia.org/wiki/The_Shining"}
+                },
+                "thumbnail": {"source": "https://upload.wikimedia.org/foo.jpg"},
+            },
+        )
+    )
+    page_url, thumb_url, summary = await v._wiki_lookup("The Shining")
+    assert page_url == "https://en.wikipedia.org/wiki/The_Shining"
+    assert thumb_url == "https://upload.wikimedia.org/foo.jpg"
+    assert "The Shining is a 1980 horror film" in summary
+
+
+@respx.mock
+async def test_wiki_lookup_missing_page_returns_empty_summary():
+    nim = AsyncMock()
+    v = Verifier(nim_client=nim, model="m", wikipedia=True)
+    respx.get(
+        "https://en.wikipedia.org/api/rest_v1/page/summary/Bogus"
+    ).mock(return_value=Response(404))
+    page_url, thumb_url, summary = await v._wiki_lookup("Bogus")
+    assert page_url is None
+    assert thumb_url is None
+    assert summary == ""
