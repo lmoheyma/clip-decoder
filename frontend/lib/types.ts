@@ -48,6 +48,7 @@ export type PipelineStep =
   | "crossref"
   | "crossref_candidate"
   | "verify"
+  | "nim_retry"
   | "done"
   | "error";
 

@@ -78,6 +78,7 @@ class RefProposer:
         lyrics_text: str,
         frame_analyses: list[FrameAnalysis],
         on_candidate: Callable[[ReferenceCandidate], Awaitable[None]] | None = None,
+        on_progress: Callable[[str, float], Awaitable[None]] | None = None,
     ) -> list[ReferenceCandidate]:
         base_ctx = {
             "title": _escape_braces(title or "(unknown)"),
@@ -85,9 +86,19 @@ class RefProposer:
             "lyrics": _escape_braces(lyrics_text or "(none)"),
             "frame_summaries": _format_frame_summaries(frame_analyses),
         }
+        if on_progress:
+            await on_progress("Pass 1: asking LLM for general references…", 0.6)
         pass1 = await self._call(self._tpl_general, base_ctx)
+        if on_progress:
+            await on_progress(f"Pass 1: {len(pass1)} candidates", 0.63)
 
         types_covered = ", ".join(sorted({c.work_type for c in pass1})) or "(none)"
+        if on_progress:
+            await on_progress(
+                f"Pass 2: asking LLM for complementary types "
+                f"(already covered: {types_covered})",
+                0.64,
+            )
         try:
             pass2 = await self._call(
                 self._tpl_complement,
@@ -98,8 +109,14 @@ class RefProposer:
                 "ref proposer pass 2 failed (%s) — keeping pass 1 only", e,
             )
             pass2 = []
+        if on_progress:
+            await on_progress(f"Pass 2: {len(pass2)} additional candidates", 0.67)
 
         merged = _merge(pass1, pass2)
+        if on_progress:
+            await on_progress(
+                f"Merged → {len(merged)} unique candidates", 0.69,
+            )
         if on_candidate:
             for c in merged:
                 await on_candidate(c)

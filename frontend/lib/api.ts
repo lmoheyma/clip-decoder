@@ -54,6 +54,7 @@ export function subscribePipeline(
     "crossref",
     "crossref_candidate",
     "verify",
+    "nim_retry",
     "done",
     "error",
   ];

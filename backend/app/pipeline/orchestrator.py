@@ -3,6 +3,7 @@ import logging
 from app.api.sse import EventBus
 from app.db import AnalysisStatus, Database
 from app.models import PipelineEvent, Report
+from app.nim.client import bind_nim_event_sink, unbind_nim_event_sink
 from app.pipeline.frame_analyzer import FrameAnalyzer
 from app.pipeline.ingestor import Ingestor
 from app.pipeline.ref_proposer import RefProposer
@@ -53,6 +54,18 @@ class Orchestrator:
             return
 
         yid = ingest.youtube_id
+
+        # Surface NIM transport retries and >=400s as log events so the
+        # user-visible LogPane shows what's happening during long LLM calls
+        # instead of going silent. Bound for the lifetime of this run.
+        # Always uses step="nim_retry" (non-terminal) — if the NIM call
+        # ultimately fails the orchestrator's main exception handler emits
+        # the terminal "error" event. Emitting "error" here would close
+        # the bus prematurely because the bus treats "error" as terminal.
+        async def _nim_sink(level: str, message: str) -> None:
+            await self._emit(yid, "nim_retry", message, progress=0.0)
+
+        sink_token = bind_nim_event_sink(_nim_sink)
         try:
             await self._db.set_status(yid, AnalysisStatus.RUNNING)
             await self._emit(
@@ -127,6 +140,10 @@ class Orchestrator:
                 )
 
             await self._emit(yid, "crossref", "Cross-referencing", 0.6)
+
+            async def _on_crossref_progress(msg: str, progress: float) -> None:
+                await self._emit(yid, "crossref", msg, progress)
+
             lyrics = " ".join(c.text for c in ingest.captions)
             candidates = await self._ref_proposer.propose(
                 title=ingest.title,
@@ -134,14 +151,23 @@ class Orchestrator:
                 lyrics_text=lyrics,
                 frame_analyses=frame_analyses,
                 on_candidate=_on_candidate,
+                on_progress=_on_crossref_progress,
             )
             await self._emit(
                 yid, "crossref", f"Proposed {len(candidates)} candidates", 0.7
             )
 
-            await self._emit(yid, "verify", "Verifying claims", 0.75)
+            await self._emit(
+                yid, "verify", f"Verifying {len(candidates)} claims", 0.75
+            )
+
+            async def _on_verify_progress(msg: str, progress: float) -> None:
+                await self._emit(yid, "verify", msg, progress)
+
             frame_index = {fa.frame_id: fa for fa in frame_analyses}
-            verified = await self._verifier.verify_all(candidates, frame_index)
+            verified = await self._verifier.verify_all(
+                candidates, frame_index, on_progress=_on_verify_progress,
+            )
             kept = [v for v in verified if v.final_confidence.value != "hidden"]
 
             report = Report(
@@ -169,3 +195,5 @@ class Orchestrator:
             msg = str(e) or type(e).__name__
             await self._db.set_status(yid, AnalysisStatus.ERROR, error=msg)
             await self._emit(yid, "error", msg, progress=0.0)
+        finally:
+            unbind_nim_event_sink(sink_token)

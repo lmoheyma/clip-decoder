@@ -61,8 +61,18 @@ export function buildLogLines(events: PipelineEvent[]): LogLine[] {
         text: `→ ${p.work_title} / ${p.work_creator}`,
         isCandidate: true,
       });
+    } else if (e.step === "crossref") {
+      lines.push({ t, lvl: "crossref", text: e.message });
+    } else if (e.step === "verify") {
+      lines.push({ t, lvl: "verify", text: e.message });
+    } else if (e.step === "vision" && e.message) {
+      lines.push({ t, lvl: "vision", text: e.message });
+    } else if (e.step === "nim_retry") {
+      lines.push({ t, lvl: "retry", text: e.message });
     } else if (e.step === "error") {
       lines.push({ t, lvl: "error", text: e.message, isError: true });
+    } else if (e.step === "done") {
+      lines.push({ t, lvl: "done", text: e.message });
     }
   }
   return lines.slice(-30);

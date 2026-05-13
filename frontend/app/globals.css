@@ -832,7 +832,7 @@ html, body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 24px;
-  padding: 0 clamp(32px, 5vw, 64px) 32px;
+  padding: clamp(28px, 4vw, 48px) clamp(32px, 5vw, 64px) 32px;
 }
 @media (min-width: 1024px) {
   .pipeline-stage { grid-template-columns: 350px minmax(0, 1fr) 320px; }
