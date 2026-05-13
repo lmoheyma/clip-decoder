@@ -835,12 +835,13 @@ html, body {
   padding: 0 clamp(32px, 5vw, 64px) 32px;
 }
 @media (min-width: 1024px) {
-  .pipeline-stage { grid-template-columns: 350px 1fr 320px; }
+  .pipeline-stage { grid-template-columns: 350px minmax(0, 1fr) 320px; }
 }
 .pipeline-col-left, .pipeline-col-center, .pipeline-col-right {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .pipeline-h2 {
