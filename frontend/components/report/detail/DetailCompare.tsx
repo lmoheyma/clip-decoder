@@ -1,5 +1,7 @@
 "use client";
+import { useEffect, useRef } from "react";
 import type { FrameAnalysis, VerifiedReference } from "@/lib/types";
+import { VideoPlayer, type VideoPlayerHandle } from "@/components/VideoPlayer";
 
 function formatTimecode(s: number): string {
   const t = Math.floor(s);
@@ -28,6 +30,13 @@ export function DetailCompare({
   const shotId = reference.source_frame_id.toUpperCase();
   const compositionShort = truncate(frame?.composition, 60);
 
+  const playerRef = useRef<VideoPlayerHandle>(null);
+  useEffect(() => {
+    // Seek every time the timestamp changes (prev/next navigation
+    // re-renders this component without remounting the iframe).
+    playerRef.current?.seekTo(reference.timestamp_s);
+  }, [reference.timestamp_s]);
+
   // Right-pane sub line: join only the non-null metadata fields with " · ".
   const rightSubParts = [
     reference.work_creator,
@@ -40,12 +49,10 @@ export function DetailCompare({
     <div className="detail-compare">
       <div className="detail-pane">
         <div className="img">
-          <img
-            src={`/api/frames/${youtubeId}/${reference.source_frame_id}`}
-            alt=""
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
+          <VideoPlayer
+            ref={playerRef}
+            youtubeId={youtubeId}
+            startSeconds={reference.timestamp_s}
           />
         </div>
         <div className="body">

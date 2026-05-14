@@ -32,4 +32,16 @@ describe("VideoPlayer", () => {
     });
     expect(target).toBe("https://www.youtube-nocookie.com");
   });
+
+  it("bakes startSeconds into the iframe src as start=N", () => {
+    const { container } = render(<VideoPlayer youtubeId="abc" startSeconds={42.7} />);
+    const iframe = container.querySelector("iframe");
+    expect(iframe?.getAttribute("src")).toMatch(/[?&]start=42(?:&|$)/);
+  });
+
+  it("omits start= when startSeconds is not provided", () => {
+    const { container } = render(<VideoPlayer youtubeId="abc" />);
+    const iframe = container.querySelector("iframe");
+    expect(iframe?.getAttribute("src")).not.toMatch(/start=/);
+  });
 });
