@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
-from sqlalchemy import String, Float, Integer, DateTime, JSON, ForeignKey, select
+from sqlalchemy import String, Float, DateTime, JSON
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -39,20 +39,6 @@ class AnalysisRow(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
-    )
-
-
-class FlagRow(Base):
-    __tablename__ = "flagged_references"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    youtube_id: Mapped[str] = mapped_column(
-        String, ForeignKey("analyses.youtube_id"), nullable=False
-    )
-    ref_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    reason: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -154,23 +140,3 @@ class Database:
             if row is None or row.report_json is None:
                 return None
             return Report.model_validate(row.report_json), row.created_at
-
-    async def flag_reference(
-        self, youtube_id: str, ref_index: int, reason: str | None = None
-    ) -> None:
-        async with self._session() as s:
-            s.add(FlagRow(youtube_id=youtube_id, ref_index=ref_index, reason=reason))
-            await s.commit()
-
-    async def list_flags(self, youtube_id: str) -> list[dict[str, Any]]:
-        async with self._session() as s:
-            stmt = select(FlagRow).where(FlagRow.youtube_id == youtube_id)
-            result = await s.execute(stmt)
-            return [
-                {
-                    "ref_index": r.ref_index,
-                    "reason": r.reason,
-                    "created_at": r.created_at.isoformat(),
-                }
-                for r in result.scalars().all()
-            ]

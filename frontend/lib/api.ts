@@ -26,17 +26,22 @@ export async function fetchReport(youtubeId: string): Promise<Report | null> {
   return (await r.json()) as Report;
 }
 
-export async function flagReference(
-  youtubeId: string,
-  refIndex: number,
-  reason?: string,
-): Promise<void> {
-  const r = await fetch(`/api/report/${encodeURIComponent(youtubeId)}/flag`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ref_index: refIndex, reason }),
-  });
-  if (!r.ok) throw new Error(`flag failed: ${r.status}`);
+export type AnalysisLifecycle =
+  | "not_found"
+  | "pending"
+  | "running"
+  | "done"
+  | "error";
+
+export interface StatusResponse {
+  status: AnalysisLifecycle;
+  error: string | null;
+}
+
+export async function fetchStatus(youtubeId: string): Promise<StatusResponse> {
+  const r = await fetch(`/api/status/${encodeURIComponent(youtubeId)}`);
+  if (!r.ok) throw new Error(`status failed: ${r.status}`);
+  return (await r.json()) as StatusResponse;
 }
 
 export function subscribePipeline(

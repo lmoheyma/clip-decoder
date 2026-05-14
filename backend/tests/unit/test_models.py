@@ -56,6 +56,9 @@ def test_verified_reference_verdict_enum():
         final_confidence=Confidence.CONFIRMED,
         supporting_elements=["symmetry", "corridor", "slow track"],
         wikipedia_url="https://en.wikipedia.org/wiki/The_Shining_(film)",
+        cross_ref_reasoning="match",
+        adversarial_reasoning="none",
+        wikipedia_reasoning="aligned",
     )
     assert vr.verdict == Verdict.KEEP
 

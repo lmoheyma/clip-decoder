@@ -6,12 +6,12 @@ import type {
   Report,
   VerifiedReference,
 } from "@/lib/types";
-import { flagReference } from "@/lib/api";
 import { computeReportStats } from "@/lib/reportStats";
 import { VideoPlayer, type VideoPlayerHandle } from "@/components/VideoPlayer";
 import { FilterBar } from "@/components/FilterBar";
 import { SummaryCard } from "@/components/SummaryCard";
 import { ReferenceCard } from "@/components/ReferenceCard";
+import { BrandMark } from "@/components/BrandMark";
 
 function formatDuration(s: number): string {
   const t = Math.floor(s);
@@ -55,6 +55,28 @@ export function ReportContent({
     }
   }, [stats, selectedTypes.size]);
 
+  // SP4 — hash-based seek. When the user lands on /report/{id}#t=42.5
+  // (typically returning from a reference detail page's JUMP action),
+  // seek the embedded player to that timestamp once it has mounted,
+  // then clear the hash so a future share/copy of the URL does not
+  // re-seek silently.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = window.location.hash.match(/^#t=(\d+(?:\.\d+)?)$/);
+    if (!m) return;
+    const t = Number.parseFloat(m[1]);
+    if (Number.isNaN(t)) return;
+    const timer = setTimeout(() => {
+      playerRef.current?.seekTo(t);
+      history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [report]);
+
   const frameById = useMemo(() => {
     const m = new Map<string, FrameAnalysis>();
     for (const f of report.frame_analyses) m.set(f.frame_id, f);
@@ -88,9 +110,6 @@ export function ReportContent({
   function jumpTo(ref: VerifiedReference) {
     playerRef.current?.seekTo(ref.timestamp_s);
   }
-  async function handleFlag(idx: number) {
-    await flagReference(youtubeId, idx);
-  }
   async function shareLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -101,35 +120,19 @@ export function ReportContent({
     }
   }
 
-  function Slate({
-    youtubeId,
-    duration,
-    shots,
-    refs,
-  }: {
-    youtubeId: string;
-    duration: number;
-    shots: number;
-    refs: number;
-  }) {
+  function Slate() {
     return (
       <div className="slate">
-        <span className="dot" />
+        <BrandMark />
         <b>ClipDecoder</b>
         <span className="slate-context">Report</span>
         <span className="sep" />
-        <span className="tc">{youtubeId}</span>
-        <span className="tc">{formatDuration(duration)}</span>
-        <span className="tc">
-          {shots} shots · {refs} references
-        </span>
-        <span className="sep" />
-        <button type="button" className="slate-action" onClick={shareLink}>
+        <button type="button" className="slate-link" onClick={shareLink}>
           {shareToast ? "Link copied" : "Share ↗"}
         </button>
         <a
-          className="slate-action"
-          href={`/api/report/${youtubeId}`}
+          className="slate-link"
+          href={`/api/report/${report.youtube_id}`}
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -140,41 +143,30 @@ export function ReportContent({
   }
 
   return (
-    <main className="frame surface-dark relative min-h-screen flex flex-col">
-      <Slate
-        youtubeId={report.youtube_id}
-        duration={report.duration_s}
-        shots={stats.shots}
-        refs={stats.total}
-      />
+    <main className="frame surface-dark relative min-h-screen flex flex-col report-root">
+      <div aria-hidden className="aurora aurora-report" />
+      <div aria-hidden className="aurora aurora-report-b" />
+      <div aria-hidden className="grain" />
+
+      <Slate />
 
       <header className="report-header">
-        <h1 className="serif-it report-h1">
+        <h1 className="report-h1">
           A clip you&apos;d<br />like{" "}
-          <em
-            style={{ color: "var(--grad-lavender)", fontStyle: "italic" }}
-          >
-            decoded.
-          </em>
+          <em className="report-h1-em">decoded.</em>
         </h1>
-        <h2 className="serif-it report-title">{report.title}</h2>
-        <div className="report-meta">
-          <span>{report.channel}</span>
-          <span>·</span>
-          <span>{formatDuration(report.duration_s)}</span>
-          <span>·</span>
-          <span>{stats.shots} shots</span>
-          <span>·</span>
-          <span>Analysed {formatDate(report.created_at)}</span>
+        <h2 className="report-title">{report.title}</h2>
+        <ul className="report-meta">
+          <li>{report.channel}</li>
+          <li>{formatDuration(report.duration_s)}</li>
+          <li>{stats.shots} shots</li>
+          <li>Analysed {formatDate(report.created_at)}</li>
           {stats.wikiHits > 0 && (
-            <>
-              <span>·</span>
-              <span>
-                Wikipedia verified ({stats.wikiHits}/{stats.total})
-              </span>
-            </>
+            <li>
+              Wiki <span className="meta-num">{stats.wikiHits}</span>/{stats.total}
+            </li>
           )}
-        </div>
+        </ul>
       </header>
 
       <section className="player-row">
@@ -223,27 +215,17 @@ export function ReportContent({
               <ReferenceCard
                 key={`${ref.source_frame_id}-${idx}`}
                 reference={ref}
+                index={idx}
                 paletteHex={paletteHex}
                 paletteDescriptors={paletteDescriptors}
                 youtubeId={report.youtube_id}
                 onJump={() => jumpTo(ref)}
-                onFlag={() => handleFlag(idx)}
               />
             );
           })
         )}
       </div>
 
-      <footer className="report-footer">
-        <span>Run · {report.youtube_id}</span>
-        <span>
-          Wikipedia hits · {stats.wikiHits} / {stats.total}
-        </span>
-        <span>
-          References · {stats.confirmed} confirmed · {stats.speculative}{" "}
-          speculative · {stats.hidden} hidden
-        </span>
-      </footer>
     </main>
   );
 }

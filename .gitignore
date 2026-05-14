@@ -28,3 +28,14 @@ out/
 # Tooling
 .claude/
 frontend/pnpm-workspace.yaml
+frontend/.pnpm-store/
+frontend/tsconfig.tsbuildinfo
+
+# Iteration screenshots (Playwright/MCP)
+.playwright-mcp/
+*.png
+!frontend/public/*.png
+
+# Throwaway HTML/CSS dropped during design exploration
+/index.html
+/styles.css

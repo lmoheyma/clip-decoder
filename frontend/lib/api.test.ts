@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { startAnalysis, fetchReport, flagReference } from "./api";
+import { startAnalysis, fetchReport } from "./api";
 
 describe("api client", () => {
   beforeEach(() => {
@@ -44,16 +44,4 @@ describe("api client", () => {
     expect(r).toBeNull();
   });
 
-  it("flagReference posts ref_index", async () => {
-    const mock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
-    vi.stubGlobal("fetch", mock);
-    await flagReference("abc", 0, "wrong");
-    expect(mock).toHaveBeenCalledWith(
-      "/api/report/abc/flag",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ ref_index: 0, reason: "wrong" }),
-      }),
-    );
-  });
 });

@@ -72,6 +72,9 @@ async def test_get_report_returns_payload(client):
                 reasoning="r", raw_confidence=0.5,
                 verdict=Verdict.KEEP, final_confidence=Confidence.CONFIRMED,
                 supporting_elements=[],
+                cross_ref_reasoning="matched",
+                adversarial_reasoning="none",
+                wikipedia_reasoning="aligned",
             )
         ],
         frame_analyses=[],
@@ -81,18 +84,3 @@ async def test_get_report_returns_payload(client):
     assert r.status_code == 200
     assert r.json()["title"] == "t"
     assert r.json()["references"][0]["work_title"] == "W"
-
-
-async def test_flag_endpoint(client):
-    c, db, *_ = client
-    report = Report(
-        youtube_id="x", title="t", channel="c", duration_s=1.0,
-        references=[], frame_analyses=[],
-    )
-    await db.save_report(report, status=AnalysisStatus.DONE)
-    r = await c.post(
-        "/api/report/x/flag", json={"ref_index": 0, "reason": "wrong"}
-    )
-    assert r.status_code == 200
-    flags = await db.list_flags("x")
-    assert len(flags) == 1

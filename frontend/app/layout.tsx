@@ -1,19 +1,29 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { EB_Garamond, Inter } from "next/font/google";
+import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 
-// EB Garamond loaded with italic for the "quotation." accent in the hero h1.
-const ebGaramond = EB_Garamond({
+// Fraunces — variable serif with italic, opticalSize, and SOFT axis for an
+// editorial film-essay register on the hero and reference titles.
+const fraunces = Fraunces({
   subsets: ["latin"],
-  weight: ["400"],
+  axes: ["SOFT"],
   style: ["normal", "italic"],
-  variable: "--font-eb-garamond",
+  variable: "--font-fraunces",
   display: "swap",
 });
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+// JetBrains Mono — archival metadata: timecode, entry number, step numerals,
+// the URL input field. Adds a "technical dossier" feel against the serif.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-jetbrains-mono",
   display: "swap",
 });
 
@@ -29,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${ebGaramond.variable} ${inter.variable}`}>
+    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body>{children}</body>
     </html>
   );

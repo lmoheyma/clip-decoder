@@ -31,6 +31,9 @@ def sample_report() -> Report:
                 verdict=Verdict.KEEP,
                 final_confidence=Confidence.CONFIRMED,
                 supporting_elements=["symmetry"],
+                cross_ref_reasoning="matched_metadata",
+                adversarial_reasoning="no_counterexample",
+                wikipedia_reasoning="summary_aligned",
             )
         ],
         frame_analyses=[],
@@ -70,11 +73,3 @@ async def test_status_lifecycle(db: Database, sample_report: Report):
     assert await db.get_status("abc123") == AnalysisStatus.RUNNING
     await db.save_report(sample_report, status=AnalysisStatus.DONE)
     assert await db.get_status("abc123") == AnalysisStatus.DONE
-
-
-async def test_flag_reference(db: Database, sample_report: Report):
-    await db.save_report(sample_report, status=AnalysisStatus.DONE)
-    await db.flag_reference("abc123", ref_index=0, reason="wrong")
-    flags = await db.list_flags("abc123")
-    assert len(flags) == 1
-    assert flags[0]["ref_index"] == 0

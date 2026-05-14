@@ -10,12 +10,17 @@ function makeRef(overrides: Partial<VerifiedReference>): VerifiedReference {
     work_creator: "Anon",
     work_year: 2000,
     work_type: "Painting",
-    reasoning: "x",
     raw_confidence: 0.5,
     verdict: "keep",
     final_confidence: "confirmed",
     supporting_elements: [],
     wikipedia_url: null,
+    cross_ref_reasoning: "",
+    adversarial_reasoning: "",
+    wikipedia_reasoning: "",
+    medium: null,
+    institution: null,
+    inception_year: null,
     ...overrides,
   };
 }

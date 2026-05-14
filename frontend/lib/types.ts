@@ -8,13 +8,19 @@ export interface VerifiedReference {
   work_creator: string;
   work_year: number | null;
   work_type: string;
-  reasoning: string;
   raw_confidence: number;
   verdict: Verdict;
   final_confidence: Confidence;
   supporting_elements: string[];
   wikipedia_url: string | null;
   wikipedia_thumbnail_url?: string | null;
+
+  cross_ref_reasoning: string;
+  adversarial_reasoning: string;
+  wikipedia_reasoning: string;
+  medium: string | null;
+  institution: string | null;
+  inception_year: number | null;
 }
 
 export interface FrameAnalysis {

@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     max_shots_per_video: int = 80
     nim_concurrency: int = 4
     wikipedia_verification: bool = True
+    # Wikidata enrichment for VerifiedReference (medium/institution/inception_year).
+    # Independent of wikipedia_verification: a run can have Wikipedia URL/thumb
+    # lookup enabled while skipping Wikidata calls. Wikidata is only consulted
+    # when the verifier has already produced a wikipedia_url.
+    wikidata_enrichment: bool = True
+    wikidata_concurrency: int = 4
+    wikidata_timeout_s: float = 10.0
 
     data_dir: Path = Path("data")
     db_path: Path = Path("data/clipdecoder.sqlite")

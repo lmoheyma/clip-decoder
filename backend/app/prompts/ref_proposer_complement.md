@@ -33,7 +33,6 @@ Strict JSON. No markdown. No prose outside JSON.
       "work_creator": "<director / artist / photographer>",
       "work_year": <int or null>,
       "work_type": "painting" | "photograph" | "music_video" | "film" | "album_cover" | "fashion_editorial" | "ad_campaign" | "archival_footage" | "other",
-      "reasoning": "<one sentence connecting at least three concrete visual elements>",
       "raw_confidence": <float 0..1>
     }}
   ]

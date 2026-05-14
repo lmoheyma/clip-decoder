@@ -62,7 +62,6 @@ class ReferenceCandidate(BaseModel):
     work_creator: Annotated[str, Field(min_length=1)]
     work_year: int | None = None
     work_type: str  # painting | photograph | music_video | film | album_cover | fashion_editorial | ad_campaign | archival_footage | other
-    reasoning: Annotated[str, Field(min_length=1)]
     raw_confidence: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
@@ -72,6 +71,16 @@ class VerifiedReference(ReferenceCandidate):
     supporting_elements: list[str]
     wikipedia_url: str | None = None
     wikipedia_thumbnail_url: str | None = None
+    # Reasoning fields produced by the verifier prompt (Task 3+5).
+    cross_ref_reasoning: str
+    adversarial_reasoning: str
+    wikipedia_reasoning: str
+    # Wikidata enrichment fields filled by WikidataEnricher (Task 7-10).
+    # All default to None when no Wikipedia URL was found, or Wikidata
+    # had no claim for the field.
+    medium: str | None = None
+    institution: str | None = None
+    inception_year: int | None = None
 
 
 class Report(BaseModel):
