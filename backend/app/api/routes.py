@@ -60,6 +60,17 @@ def build_router(
             status_stream_url=f"/api/stream/{yid}",
         )
 
+    @router.get("/status/{youtube_id}")
+    async def get_status(youtube_id: str) -> dict:
+        """Lightweight status probe used by the report page to distinguish
+        \"never analyzed\" (-> 404 in UI) from \"currently running\" (-> SSE
+        subscription). Returns 'not_found' when no row exists at all."""
+        status = await db.get_status(youtube_id)
+        if status is None:
+            return {"status": "not_found", "error": None}
+        err = await db.get_error(youtube_id) if status == AnalysisStatus.ERROR else None
+        return {"status": status.value, "error": err}
+
     @router.get("/report/{youtube_id}")
     async def get_report(youtube_id: str) -> dict:
         result = await db.load_report_meta(youtube_id)
@@ -96,9 +107,19 @@ def build_router(
             # terminal event from the DB instead so the frontend resolves.
             if not bus.has_history(youtube_id):
                 status = await db.get_status(youtube_id)
-                if status in (AnalysisStatus.DONE, AnalysisStatus.ERROR):
-                    from app.models import PipelineEvent
+                from app.models import PipelineEvent
 
+                if status is None:
+                    # No row at all — never analyzed and no live run. Emit a
+                    # terminal error so the EventSource resolves instead of
+                    # hanging on an SSE that will never produce anything.
+                    ev = PipelineEvent(
+                        step="error", message="Report not found.",
+                        progress=0.0, payload={"reason": "not_found"},
+                    )
+                    yield {"event": ev.step, "data": ev.model_dump_json()}
+                    return
+                if status in (AnalysisStatus.DONE, AnalysisStatus.ERROR):
                     if status == AnalysisStatus.ERROR:
                         err = await db.get_error(youtube_id) or "Pipeline failed."
                         ev = PipelineEvent(
