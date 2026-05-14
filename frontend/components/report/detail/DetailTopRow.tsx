@@ -17,11 +17,9 @@ const VERDICT_DOT: Record<string, string> = {
 export function DetailTopRow({
   reference,
   onJump,
-  onFlag,
 }: {
   reference: VerifiedReference;
   onJump: () => void;
-  onFlag: () => void;
 }) {
   const verdictLabel = reference.final_confidence.toUpperCase();
   const tc = formatTimecode(reference.timestamp_s);
@@ -45,11 +43,6 @@ export function DetailTopRow({
         </h1>
       </div>
       <div className="detail-top-actions">
-        {reference.final_confidence !== "hidden" && (
-          <button type="button" className="btn btn-ghost" onClick={onFlag}>
-            NOT CONVINCED ✕
-          </button>
-        )}
         <button type="button" className="btn" onClick={onJump}>
           JUMP ▸ {tc}
         </button>

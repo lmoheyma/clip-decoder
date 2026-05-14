@@ -6,7 +6,6 @@ import type {
   Report,
   VerifiedReference,
 } from "@/lib/types";
-import { flagReference } from "@/lib/api";
 import { computeReportStats } from "@/lib/reportStats";
 import { VideoPlayer, type VideoPlayerHandle } from "@/components/VideoPlayer";
 import { FilterBar } from "@/components/FilterBar";
@@ -109,9 +108,6 @@ export function ReportContent({
 
   function jumpTo(ref: VerifiedReference) {
     playerRef.current?.seekTo(ref.timestamp_s);
-  }
-  async function handleFlag(idx: number) {
-    await flagReference(youtubeId, idx);
   }
   async function shareLink() {
     try {
@@ -250,7 +246,6 @@ export function ReportContent({
                 paletteDescriptors={paletteDescriptors}
                 youtubeId={report.youtube_id}
                 onJump={() => jumpTo(ref)}
-                onFlag={() => handleFlag(idx)}
               />
             );
           })

@@ -30,11 +30,6 @@ class AnalyzeResponse(BaseModel):
     status_stream_url: str | None = None
 
 
-class FlagBody(BaseModel):
-    ref_index: int
-    reason: str | None = None
-
-
 def build_router(
     *,
     db: Database,
@@ -75,11 +70,6 @@ def build_router(
             **report.model_dump(mode="json"),
             "created_at": created_at.isoformat(),
         }
-
-    @router.post("/report/{youtube_id}/flag")
-    async def flag(youtube_id: str, body: FlagBody) -> dict[str, str]:
-        await db.flag_reference(youtube_id, body.ref_index, body.reason)
-        return {"status": "ok"}
 
     @router.get("/frames/{youtube_id}/{frame_id}")
     def get_frame(youtube_id: str, frame_id: str):

@@ -26,19 +26,6 @@ export async function fetchReport(youtubeId: string): Promise<Report | null> {
   return (await r.json()) as Report;
 }
 
-export async function flagReference(
-  youtubeId: string,
-  refIndex: number,
-  reason?: string,
-): Promise<void> {
-  const r = await fetch(`/api/report/${encodeURIComponent(youtubeId)}/flag`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ref_index: refIndex, reason }),
-  });
-  if (!r.ok) throw new Error(`flag failed: ${r.status}`);
-}
-
 export function subscribePipeline(
   youtubeId: string,
   onEvent: (e: PipelineEvent) => void,

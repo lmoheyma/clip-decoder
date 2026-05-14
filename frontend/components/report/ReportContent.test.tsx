@@ -15,10 +15,6 @@ vi.mock("@/components/VideoPlayer", () => {
     }),
   };
 });
-vi.mock("@/lib/api", () => ({
-  flagReference: vi.fn(),
-}));
-
 import { ReportContent } from "./ReportContent";
 import type { Report } from "@/lib/types";
 

@@ -2,7 +2,6 @@
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { FrameAnalysis, Report } from "@/lib/types";
-import { flagReference } from "@/lib/api";
 import { DetailSlate } from "./DetailSlate";
 import { DetailTopRow } from "./DetailTopRow";
 import { DetailCompare } from "./DetailCompare";
@@ -34,13 +33,6 @@ export function ReferenceDetail({
   function handleJump() {
     router.push(`/report/${youtubeId}#t=${reference.timestamp_s}`);
   }
-  function handleFlag() {
-    // Fire-and-forget with a logged catch so a network blip does not
-    // crash the page. A proper toast layer is SP5 territory.
-    flagReference(youtubeId, index).catch((err) => {
-      console.error("flagReference failed", err);
-    });
-  }
 
   return (
     <main className="frame surface-dark relative min-h-screen flex flex-col">
@@ -51,11 +43,7 @@ export function ReferenceDetail({
         total={total}
       />
       <div className="detail">
-        <DetailTopRow
-          reference={reference}
-          onJump={handleJump}
-          onFlag={handleFlag}
-        />
+        <DetailTopRow reference={reference} onJump={handleJump} />
         <DetailCompare
           reference={reference}
           frame={frame}

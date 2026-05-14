@@ -25,7 +25,6 @@ export function ReferenceCard({
   paletteDescriptors,
   youtubeId,
   onJump,
-  onFlag,
 }: {
   reference: VerifiedReference;
   index: number;
@@ -33,7 +32,6 @@ export function ReferenceCard({
   paletteDescriptors: string[];
   youtubeId: string;
   onJump: () => void;
-  onFlag: () => void;
 }) {
   const verdict = reference.final_confidence;
   const meta = VERDICT_META[verdict];
@@ -161,15 +159,6 @@ export function ReferenceCard({
           >
             WIKIPEDIA ↗
           </a>
-        )}
-        {!isHidden && (
-          <button
-            type="button"
-            className="ulink ulink-muted"
-            onClick={onFlag}
-          >
-            NOT CONVINCED ✕
-          </button>
         )}
       </div>
     </article>
