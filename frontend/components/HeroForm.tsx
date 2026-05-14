@@ -28,7 +28,6 @@ export function HeroForm({
   return (
     <div>
       <form onSubmit={submit} className="url-form">
-        <span className="pre">paste url →</span>
         <input
           id="hero-youtube-url"
           type="text"
@@ -42,10 +41,9 @@ export function HeroForm({
         <button
           type="submit"
           disabled={busy}
-          className="btn btn-primary"
+          className="btn btn-primary mr-2"
         >
           <span>{busy ? "Working" : "Decode"}</span>
-          {!busy && <span aria-hidden>↵</span>}
         </button>
       </form>
       {error && (
