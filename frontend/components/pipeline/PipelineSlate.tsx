@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { BrandMark } from "@/components/BrandMark";
 
 function formatElapsed(startTs: number): string {
   const s = Math.floor((Date.now() - startTs) / 1000);
@@ -25,15 +26,14 @@ export function PipelineSlate({
 
   return (
     <div className="slate">
-      <span className="dot" />
+      <BrandMark />
       <b>ClipDecoder</b>
-      <span className="slate-context">analysing · do not close tab</span>
+      <span className="slate-context">Analysing</span>
       <span className="sep" />
-      <span className="tc">clip · {youtubeId}</span>
-      <span className="tc">
-        elapsed {startTs ? formatElapsed(startTs) : "00:00:00"}
+      <span className="slate-tc">{youtubeId}</span>
+      <span className="slate-tc slate-tc-mute">
+        {startTs ? formatElapsed(startTs) : "00:00:00"}
       </span>
-      <span className="sep" />
     </div>
   );
 }

@@ -1005,11 +1005,65 @@ html, body {
 }
 
 .pipeline-h2 {
-  font-size: clamp(40px, 5vw, 72px);
+  font-family: var(--serif);
+  font-size: clamp(38px, 4.4vw, 64px);
   line-height: 0.96;
-  margin: 0 0 24px;
+  letter-spacing: -0.025em;
+  margin: 0 0 28px;
   color: var(--ink);
+  font-weight: 300;
+  font-variation-settings: "SOFT" 100;
 }
+.pipeline-h2 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--grad-lavender);
+}
+
+/* ── Pipeline live — atmospheric backdrop + error state ─────── */
+.pipeline-root {
+  position: relative;
+  background: var(--canvas);
+  isolation: isolate;
+}
+.pipeline-root > .slate,
+.pipeline-root > .pipeline-stage { position: relative; z-index: 1; }
+.pipeline-root > .aurora.aurora-report,
+.pipeline-root > .aurora.aurora-report-b,
+.pipeline-root > .grain { position: fixed; }
+
+.pipeline-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--error);
+  margin-bottom: 24px;
+}
+.pipeline-h1 {
+  font-family: var(--serif);
+  font-size: clamp(40px, 5.4vw, 80px);
+  line-height: 0.96;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: var(--ink);
+  font-weight: 300;
+  font-variation-settings: "SOFT" 100;
+}
+
+/* Mono-caps timecode/version chips on the slate (pipeline state) */
+.slate .slate-tc {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--body);
+  padding-left: 18px;
+  margin-left: 6px;
+  border-left: 1px solid var(--hairline-soft);
+}
+.slate .slate-tc.slate-tc-mute { color: var(--muted); }
+.slate .slate-tc:first-of-type { border-left: none; padding-left: 0; margin-left: 0; }
 
 .clip-meta {
   display: flex;
@@ -1104,28 +1158,11 @@ html, body {
 .pipeline-row:not(.done):not(.active):not(.error) .pill em { color: var(--muted); }
 .pipeline-row:not(.done):not(.active):not(.error) .pill .num { color: var(--muted-soft); }
 
-/* Active-stage motion — peach pulse on the num + a sweeping bar on the
-   progress lane. Borrows the scan/peach motif from NowFrame so the
-   pipeline list reads as part of the same instrument, not a generic
-   loading spinner. The sweep runs even when progress fraction is 0
-   (e.g. while the LLM is thinking) so the user always sees something
-   alive. */
+/* Active-stage motion — a sweeping bar on the progress lane. The numeral
+   recolors to peach to mark which stage is in flight. The pulsing dot on
+   the left was removed in favour of the cleaner sweep + colour cue. */
 .pipeline-row.active .pill .num {
   color: var(--grad-peach);
-  position: relative;
-}
-.pipeline-row.active .pill .num::before {
-  content: "";
-  position: absolute;
-  left: -10px;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  margin-top: -2.5px;
-  border-radius: 50%;
-  background: var(--grad-peach);
-  box-shadow: 0 0 0 0 var(--grad-peach);
-  animation: stage-pulse 1.6s ease-out infinite;
 }
 .pipeline-row.active .progress {
   background: color-mix(in oklab, var(--grad-peach) 18%, var(--hairline));
@@ -1146,11 +1183,6 @@ html, body {
 .pipeline-row.active .frac {
   color: var(--grad-peach);
   animation: stage-fade 1.6s ease-in-out infinite;
-}
-@keyframes stage-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--grad-peach) 80%, transparent); }
-  70%  { box-shadow: 0 0 0 8px color-mix(in oklab, var(--grad-peach) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--grad-peach) 0%, transparent); }
 }
 @keyframes stage-sweep {
   from { background-position: 200% 0; }
@@ -1392,28 +1424,9 @@ html, body {
   text-align: center;
   padding: 32px 16px;
 }
-.pipeline-footer-slate {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 16px clamp(32px, 5vw, 64px);
-  background: var(--canvas);
-  border-top: 1px solid var(--hairline);
-  font-family: var(--sans);
-  font-size: 13px;
-  color: var(--muted);
-}
-.pipeline-footer-slate .sep {
-  flex: 0 0 auto;
-  width: 1px;
-  height: 14px;
-  background: var(--hairline);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .now .scan { animation: none; display: none; }
   .candidate-card { animation: none; opacity: 1; transform: none; }
-  .pipeline-row.active .pill .num::before,
   .pipeline-row.active .progress i,
   .pipeline-row.active .frac { animation: none; }
 }
@@ -1936,28 +1949,47 @@ html, body {
   color: var(--muted);
 }
 
-/* DetailSlate — extends .slate with a focus position chip and PREV/NEXT/ESC links. */
+/* DetailSlate — slate variant with focus chip + PREV/NEXT/ESC link cluster. */
+.detail-slate-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 16px;
+}
 .detail-slate .nav-link {
-  font-family: var(--sans);
-  font-size: 12px;
-  letter-spacing: 0.96px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--body);
   text-decoration: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--hairline);
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hairline-soft);
+  transition: color 0.18s ease, border-color 0.18s ease;
 }
 .detail-slate .nav-link:hover {
   color: var(--ink);
-  border-color: var(--muted);
+  border-color: var(--hairline-strong);
 }
 .detail-slate .nav-link.disabled {
   color: var(--muted-soft);
-  border-color: var(--hairline);
+  border-color: var(--hairline-soft);
   cursor: not-allowed;
   pointer-events: none;
 }
+
+/* Atmospheric backdrop for the reference detail page — mirrors report-root. */
+.detail-root {
+  position: relative;
+  background: var(--canvas);
+  isolation: isolate;
+}
+.detail-root > .slate,
+.detail-root > .detail { position: relative; z-index: 1; }
+.detail-root > .aurora.aurora-report,
+.detail-root > .aurora.aurora-report-b,
+.detail-root > .grain { position: fixed; }
 
 /* ReferenceCard — the Link wrap is `display: contents` so the parent
    `.ref` grid (1fr 1.4fr) keeps treating `.ref-left` and `.ref-right`

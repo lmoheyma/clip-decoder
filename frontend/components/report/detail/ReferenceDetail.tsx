@@ -29,7 +29,10 @@ export function ReferenceDetail({
   const frame = frameById.get(reference.source_frame_id);
 
   return (
-    <main className="frame surface-dark relative min-h-screen flex flex-col">
+    <main className="frame surface-dark relative min-h-screen flex flex-col detail-root">
+      <div aria-hidden className="aurora aurora-report" />
+      <div aria-hidden className="aurora aurora-report-b" />
+      <div aria-hidden className="grain" />
       <DetailSlate
         youtubeId={youtubeId}
         reference={reference}

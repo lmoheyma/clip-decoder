@@ -14,7 +14,6 @@ import { NowFrame } from "./NowFrame";
 import { KeyframeStrip } from "./KeyframeStrip";
 import { LogPane } from "./LogPane";
 import { CandidatesPane } from "./CandidatesPane";
-import { PipelineFooterSlate } from "./PipelineFooterSlate";
 
 export function PipelinePage({
   youtubeId,
@@ -60,24 +59,17 @@ export function PipelinePage({
 
   if (error) {
     return (
-      <main className="frame surface-dark relative min-h-screen flex flex-col">
+      <main className="frame surface-dark relative min-h-screen flex flex-col pipeline-root">
+        <div aria-hidden className="aurora aurora-report" />
+        <div aria-hidden className="aurora aurora-report-b" />
+        <div aria-hidden className="grain" />
         <PipelineSlate youtubeId={youtubeId} startTs={startTs} />
-        <div style={{ padding: "clamp(32px, 5vw, 64px)", maxWidth: 720 }}>
-          <div className="hairline" style={{ marginBottom: 16, color: "var(--error)" }}>
-            Pipeline error
-          </div>
-          <h1
-            className="serif-it"
-            style={{ fontSize: "clamp(28px, 4vw, 48px)", color: "var(--ink)" }}
-            role="alert"
-          >
+        <div style={{ padding: "clamp(48px, 6vw, 80px)", maxWidth: 760, position: "relative", zIndex: 1 }}>
+          <div className="pipeline-eyebrow">Pipeline error</div>
+          <h1 className="pipeline-h1" role="alert">
             {error}
           </h1>
-          <Link
-            className="ulink"
-            href="/"
-            style={{ marginTop: 24, display: "inline-block" }}
-          >
+          <Link className="not-found-cta" href="/" style={{ marginTop: 32, display: "inline-flex" }}>
             ← Try another clip
           </Link>
         </div>
@@ -86,12 +78,15 @@ export function PipelinePage({
   }
 
   return (
-    <main className="frame surface-dark relative min-h-screen flex flex-col">
+    <main className="frame surface-dark relative min-h-screen flex flex-col pipeline-root">
+      <div aria-hidden className="aurora aurora-report" />
+      <div aria-hidden className="aurora aurora-report-b" />
+      <div aria-hidden className="grain" />
       <PipelineSlate youtubeId={youtubeId} startTs={startTs} />
 
       <div className="pipeline-stage">
         <div className="pipeline-col-left">
-          <h2 className="pipeline-h2 serif-it">
+          <h2 className="pipeline-h2">
             <em>Reading</em>
             <br />
             the tape.
@@ -115,8 +110,6 @@ export function PipelinePage({
           <CandidatesPane events={events} />
         </div>
       </div>
-
-      <PipelineFooterSlate />
     </main>
   );
 }

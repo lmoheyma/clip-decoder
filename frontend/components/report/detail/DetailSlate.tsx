@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import type { VerifiedReference } from "@/lib/types";
+import { BrandMark } from "@/components/BrandMark";
 
 function formatTimecode(s: number): string {
   const t = Math.floor(s);
@@ -27,22 +28,26 @@ export function DetailSlate({
   const reportHref = `/report/${youtubeId}`;
   return (
     <div className="slate detail-slate">
-      <span className="dot" />
-      <b>FOCUS · REFERENCE {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}</b>
+      <BrandMark />
+      <b>ClipDecoder</b>
+      <span className="slate-context">
+        Focus · {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+      </span>
       <span className="sep" />
-      <span className="tc">{tc} · {shotId}</span>
-      <span className="sep" />
-      {prevDisabled ? (
-        <span className="nav-link disabled" aria-disabled="true">← PREV</span>
-      ) : (
-        <Link className="nav-link" href={`/report/${youtubeId}/ref/${index - 1}`}>← PREV</Link>
-      )}
-      {nextDisabled ? (
-        <span className="nav-link disabled" aria-disabled="true">NEXT →</span>
-      ) : (
-        <Link className="nav-link" href={`/report/${youtubeId}/ref/${index + 1}`}>NEXT →</Link>
-      )}
-      <Link className="nav-link" href={reportHref}>ESC</Link>
+      <span className="slate-tc">{tc} · {shotId}</span>
+      <span className="detail-slate-nav">
+        {prevDisabled ? (
+          <span className="nav-link disabled" aria-disabled="true">← PREV</span>
+        ) : (
+          <Link className="nav-link" href={`/report/${youtubeId}/ref/${index - 1}`}>← PREV</Link>
+        )}
+        {nextDisabled ? (
+          <span className="nav-link disabled" aria-disabled="true">NEXT →</span>
+        ) : (
+          <Link className="nav-link" href={`/report/${youtubeId}/ref/${index + 1}`}>NEXT →</Link>
+        )}
+        <Link className="nav-link" href={reportHref}>ESC</Link>
+      </span>
     </div>
   );
 }
