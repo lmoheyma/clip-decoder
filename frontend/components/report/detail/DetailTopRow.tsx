@@ -1,13 +1,6 @@
 "use client";
 import type { VerifiedReference } from "@/lib/types";
 
-function formatTimecode(s: number): string {
-  const t = Math.floor(s);
-  const m = Math.floor(t / 60);
-  const sec = t % 60;
-  return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
-}
-
 const VERDICT_DOT: Record<string, string> = {
   confirmed: "var(--grad-peach)",
   speculative: "var(--grad-sky)",
@@ -16,13 +9,10 @@ const VERDICT_DOT: Record<string, string> = {
 
 export function DetailTopRow({
   reference,
-  onJump,
 }: {
   reference: VerifiedReference;
-  onJump: () => void;
 }) {
   const verdictLabel = reference.final_confidence.toUpperCase();
-  const tc = formatTimecode(reference.timestamp_s);
   return (
     <div className="detail-top">
       <div>
@@ -41,11 +31,6 @@ export function DetailTopRow({
             {reference.work_year !== null ? `, ${reference.work_year}` : ""}
           </span>
         </h1>
-      </div>
-      <div className="detail-top-actions">
-        <button type="button" className="btn" onClick={onJump}>
-          JUMP ▸ {tc}
-        </button>
       </div>
     </div>
   );

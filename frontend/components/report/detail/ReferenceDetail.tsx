@@ -1,6 +1,5 @@
 "use client";
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
 import type { FrameAnalysis, Report } from "@/lib/types";
 import { DetailSlate } from "./DetailSlate";
 import { DetailTopRow } from "./DetailTopRow";
@@ -19,7 +18,6 @@ export function ReferenceDetail({
   const reference = report.references[index];
   const total = report.references.length;
   const youtubeId = report.youtube_id;
-  const router = useRouter();
 
   useDetailKeyboardNav({ youtubeId, index, total });
 
@@ -30,10 +28,6 @@ export function ReferenceDetail({
   }, [report.frame_analyses]);
   const frame = frameById.get(reference.source_frame_id);
 
-  function handleJump() {
-    router.push(`/report/${youtubeId}#t=${reference.timestamp_s}`);
-  }
-
   return (
     <main className="frame surface-dark relative min-h-screen flex flex-col">
       <DetailSlate
@@ -43,7 +37,7 @@ export function ReferenceDetail({
         total={total}
       />
       <div className="detail">
-        <DetailTopRow reference={reference} onJump={handleJump} />
+        <DetailTopRow reference={reference} />
         <DetailCompare
           reference={reference}
           frame={frame}
