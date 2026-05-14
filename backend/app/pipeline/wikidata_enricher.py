@@ -265,7 +265,7 @@ class WikidataEnricher:
             "action": "wbgetentities",
             "ids": "|".join(qids),
             "props": "labels",
-            "languages": "en",
+            "languages": "fr|en",
             "format": "json",
         })
         if r.status_code != 200:
@@ -273,7 +273,10 @@ class WikidataEnricher:
         out: dict[str, str] = {}
         entities = (r.json().get("entities") or {})
         for qid, entity in entities.items():
-            label = ((entity.get("labels") or {}).get("en") or {}).get("value")
+            labels = entity.get("labels") or {}
+            fr = (labels.get("fr") or {}).get("value")
+            en = (labels.get("en") or {}).get("value")
+            label = fr or en
             if label:
                 out[qid] = label
         return out

@@ -409,3 +409,56 @@ async def test_painting_does_not_pick_up_p577():
     enricher = WikidataEnricher(concurrency=2)
     out = await enricher.enrich([_ref()])  # default work_type="painting"
     assert out[0].inception_year is None
+
+
+@respx.mock
+async def test_label_prefers_fr_over_en():
+    """When wbgetentities returns both fr and en labels, the enricher stores fr."""
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q123"}}}}
+        })
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q123.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q123": {"claims": {
+            "P186": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q300"}}}}],
+        }}}
+    }))
+    respx.get("https://www.wikidata.org/w/api.php").mock(
+        return_value=Response(200, json={"entities": {
+            "Q300": {"labels": {
+                "fr": {"value": "huile sur toile"},
+                "en": {"value": "oil on canvas"},
+            }},
+        }})
+    )
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref()])
+    assert out[0].medium == "huile sur toile"
+
+
+@respx.mock
+async def test_label_falls_back_to_en_when_fr_missing():
+    """When wbgetentities only returns en, the enricher stores en."""
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q123"}}}}
+        })
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q123.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q123": {"claims": {
+            "P186": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q300"}}}}],
+        }}}
+    }))
+    respx.get("https://www.wikidata.org/w/api.php").mock(
+        return_value=Response(200, json={"entities": {
+            "Q300": {"labels": {"en": {"value": "oil on canvas"}}},
+        }})
+    )
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref()])
+    assert out[0].medium == "oil on canvas"
