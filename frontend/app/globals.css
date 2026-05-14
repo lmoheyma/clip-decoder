@@ -1710,35 +1710,37 @@ html, body {
   color: var(--ink);
   border-left: 2px solid var(--grad-peach);
   padding-left: 16px;
-  margin: 0 0 22px;
+  margin: 0 0 28px;
 }
-/* Three editorial passes — each one a distinct section with a colored
-   left-rule, an eyebrow label (NUM · NAME), and breathing space between
-   blocks so the reader can scan the chain of evidence at a glance. */
+/* Three editorial passes. Each one is a tinted card with a thick colored
+   left rule, an oversized colored numeral, and an uppercase label —
+   loud enough to read at a glance even when the body text is dense. */
 .detail-reasoning .pass {
-  border-left: 2px solid var(--hairline);
-  padding-left: 14px;
-  margin: 0 0 20px;
+  position: relative;
+  border-left: 4px solid var(--hairline);
+  border-radius: 6px;
+  padding: 14px 16px 14px 18px;
+  margin: 0 0 18px;
 }
 .detail-reasoning .pass:last-of-type { margin-bottom: 0; }
 .detail-reasoning .pass header {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 6px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 .detail-reasoning .pass header .num {
   font-family: var(--sans);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.96px;
-  color: var(--muted);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 .detail-reasoning .pass header .lbl {
   font-family: var(--sans);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.96px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
   color: var(--ink);
 }
@@ -1749,11 +1751,23 @@ html, body {
   color: var(--body-strong);
   margin: 0;
 }
-.detail-reasoning .pass-crossref { border-left-color: var(--grad-peach); }
+/* Cross-reference — defense. Peach tint, peach numeral, peach rule. */
+.detail-reasoning .pass-crossref {
+  border-left-color: var(--grad-peach);
+  background: color-mix(in oklab, var(--grad-peach) 9%, transparent);
+}
 .detail-reasoning .pass-crossref .num { color: var(--grad-peach); }
-.detail-reasoning .pass-adversarial { border-left-color: var(--grad-sky); }
+/* Adversarial — challenge. Sky tint, sky numeral. */
+.detail-reasoning .pass-adversarial {
+  border-left-color: var(--grad-sky);
+  background: color-mix(in oklab, var(--grad-sky) 9%, transparent);
+}
 .detail-reasoning .pass-adversarial .num { color: var(--grad-sky); }
-.detail-reasoning .pass-wikipedia { border-left-color: var(--grad-lavender); }
+/* Wikipedia — external verification. Lavender tint, lavender numeral. */
+.detail-reasoning .pass-wikipedia {
+  border-left-color: var(--grad-lavender);
+  background: color-mix(in oklab, var(--grad-lavender) 9%, transparent);
+}
 .detail-reasoning .pass-wikipedia .num { color: var(--grad-lavender); }
 
 .detail-frame-analysis dl {
