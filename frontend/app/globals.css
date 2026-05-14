@@ -613,8 +613,8 @@ html, body {
 /* ─── Grid of reference cards ────────────────── */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(640px, 100%), 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr));
+  gap: 18px;
   padding: 32px clamp(32px, 5vw, 64px);
 }
 
@@ -622,8 +622,8 @@ html, body {
 .ref {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
-  padding: 24px;
+  gap: 16px;
+  padding: 16px;
   background: var(--surface-card);
   border: 1px solid var(--hairline);
   border-left-width: 2px;
@@ -632,7 +632,7 @@ html, body {
   cursor: pointer;
   transition: border-color 0.18s ease;
 }
-@media (min-width: 768px) {
+@media (min-width: 640px) {
   .ref { grid-template-columns: 1fr 1.4fr; }
 }
 .ref:hover { border-color: var(--hairline-strong); }
@@ -645,8 +645,8 @@ html, body {
 .ref-speculative { border-left-color: var(--grad-sky); opacity: 0.95; }
 .ref-hidden { border-left-color: var(--error); opacity: 0.7; }
 
-.ref-left { display: flex; flex-direction: column; gap: 8px; }
-.ref-right { display: flex; flex-direction: column; gap: 12px; }
+.ref-left { display: flex; flex-direction: column; gap: 6px; }
+.ref-right { display: flex; flex-direction: column; gap: 8px; }
 
 /* Frame thumb */
 .thumb {
@@ -715,9 +715,9 @@ html, body {
   gap: 12px;
 }
 .ref-title {
-  font-size: clamp(22px, 2.4vw, 32px);
-  line-height: 1.18;
-  letter-spacing: -0.22px;
+  font-size: clamp(17px, 1.5vw, 22px);
+  line-height: 1.2;
+  letter-spacing: -0.15px;
   margin: 0;
   color: var(--ink);
 }
@@ -747,14 +747,19 @@ html, body {
   color: var(--muted);
 }
 
-/* Card reasoning */
+/* Card reasoning — capped at 3 lines so cards stay compact in the grid;
+   the full text shows on the reference detail page. */
 .ref-reasoning {
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--body);
   margin: 0;
   max-width: 60ch;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Evidence chips row */
