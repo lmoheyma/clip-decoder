@@ -87,14 +87,17 @@ from app.pipeline.wikidata_enricher import WikidataEnricher
 from app.models import VerifiedReference, Verdict, Confidence
 
 
-def _ref(wiki_url: str | None = "https://en.wikipedia.org/wiki/Le_faux_miroir") -> VerifiedReference:
+def _ref(
+    wiki_url: str | None = "https://en.wikipedia.org/wiki/Le_faux_miroir",
+    work_type: str = "painting",
+) -> VerifiedReference:
     return VerifiedReference(
         timestamp_s=42.0,
         source_frame_id="shot_03",
         work_title="Le faux miroir",
         work_creator="René Magritte",
         work_year=1929,
-        work_type="painting",
+        work_type=work_type,
         raw_confidence=0.9,
         verdict=Verdict.KEEP,
         final_confidence=Confidence.CONFIRMED,
@@ -275,7 +278,7 @@ async def test_falls_back_to_p577_for_films():
         }}}
     }))
     enricher = WikidataEnricher(concurrency=2)
-    out = await enricher.enrich([_ref()])
+    out = await enricher.enrich([_ref(work_type="film")])
     assert out[0].inception_year == 1999
     assert out[0].medium is None
     assert out[0].institution is None
@@ -302,5 +305,107 @@ async def test_falls_back_to_p272_for_film_institution():
         })
     )
     enricher = WikidataEnricher(concurrency=2)
-    out = await enricher.enrich([_ref()])
+    out = await enricher.enrich([_ref(work_type="film")])
     assert out[0].institution == "Warner Bros."
+
+
+@respx.mock
+async def test_film_uses_p136_p272_p577_together():
+    """For work_type='film', the enricher reads P136 (genre→medium),
+    P272 (production company→institution), P577 (publication date→year)."""
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q83495"}}}}
+        })
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q83495.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q83495": {"claims": {
+            "P136": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q500"}}}}],
+            "P272": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q42"}}}}],
+            "P577": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"time": "+1979-05-25T00:00:00Z"}}}}],
+        }}}
+    }))
+    respx.get("https://www.wikidata.org/w/api.php").mock(
+        return_value=Response(200, json={"entities": {
+            "Q500": {"labels": {"en": {"value": "science fiction film"}}},
+            "Q42":  {"labels": {"en": {"value": "Mosfilm"}}},
+        }})
+    )
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref(work_type="film")])
+    assert out[0].medium == "science fiction film"
+    assert out[0].institution == "Mosfilm"
+    assert out[0].inception_year == 1979
+
+
+@respx.mock
+async def test_music_video_uses_p264_for_label():
+    """For work_type='music_video', institution comes from P264 (record label)."""
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q1"}}}}
+        })
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q1.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q1": {"claims": {
+            "P264": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q888"}}}}],
+        }}}
+    }))
+    respx.get("https://www.wikidata.org/w/api.php").mock(
+        return_value=Response(200, json={"entities": {
+            "Q888": {"labels": {"en": {"value": "DGC Records"}}},
+        }})
+    )
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref(work_type="music_video")])
+    assert out[0].institution == "DGC Records"
+
+
+@respx.mock
+async def test_unknown_work_type_uses_painting_defaults():
+    """Unknown work_type → falls back to painting's P186/P276/P571 mapping."""
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q1"}}}}
+        })
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q1.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q1": {"claims": {
+            "P186": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"id": "Q300"}}}}],
+        }}}
+    }))
+    respx.get("https://www.wikidata.org/w/api.php").mock(
+        return_value=Response(200, json={"entities": {
+            "Q300": {"labels": {"en": {"value": "oil on canvas"}}},
+        }})
+    )
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref(work_type="unrecognized_thing")])
+    assert out[0].medium == "oil on canvas"
+
+
+@respx.mock
+async def test_painting_does_not_pick_up_p577():
+    """Regression: paintings consult only P571 for inception. A claims
+    payload containing P577 (but no P571) must leave inception_year=None."""
+    respx.get("https://en.wikipedia.org/w/api.php").mock(
+        return_value=Response(200, json={
+            "query": {"pages": {"123": {"pageprops": {"wikibase_item": "Q123"}}}}
+        })
+    )
+    respx.get(
+        "https://www.wikidata.org/wiki/Special:EntityData/Q123.json"
+    ).mock(return_value=Response(200, json={
+        "entities": {"Q123": {"claims": {
+            "P577": [{"rank": "normal", "mainsnak": {"datavalue": {"value": {"time": "+2020-01-01T00:00:00Z"}}}}],
+        }}}
+    }))
+    enricher = WikidataEnricher(concurrency=2)
+    out = await enricher.enrich([_ref()])  # default work_type="painting"
+    assert out[0].inception_year is None

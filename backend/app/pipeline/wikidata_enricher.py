@@ -74,6 +74,29 @@ _WIKIDATA_ENTITY = "https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
 _WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 
 
+# Per-work_type Wikidata property dispatch. Each work_type names an
+# ordered list of property codes per output field. The enricher walks
+# the list in order and stops at the first non-null claim. Unknown
+# work_types fall back to `_DEFAULT_PROPS` (painting).
+#
+# P31  instance-of      | P136 genre              | P186 material/medium
+# P264 record label     | P272 production company | P276 location
+# P123 publisher        | P1056 product           | P1433 published in
+# P571 inception        | P577 publication date
+_PROPS_BY_WORK_TYPE: dict[str, dict[str, list[str]]] = {
+    "painting":          {"medium": ["P186"], "institution": ["P276"],         "inception": ["P571"]},
+    "photograph":        {"medium": ["P186"], "institution": ["P276"],         "inception": ["P571", "P577"]},
+    "film":              {"medium": ["P136"], "institution": ["P272"],         "inception": ["P577", "P571"]},
+    "music_video":       {"medium": ["P31"],  "institution": ["P264", "P272"], "inception": ["P577"]},
+    "album_cover":       {"medium": ["P186"], "institution": ["P264"],         "inception": ["P577"]},
+    "fashion_editorial": {"medium": ["P186"], "institution": ["P1433"],        "inception": ["P577", "P571"]},
+    "ad_campaign":       {"medium": ["P31"],  "institution": ["P1056"],        "inception": ["P577"]},
+    "archival_footage":  {"medium": ["P31"],  "institution": ["P123"],         "inception": ["P577"]},
+    "other":             {"medium": ["P186", "P31"], "institution": ["P276", "P123"], "inception": ["P577", "P571"]},
+}
+_DEFAULT_PROPS = _PROPS_BY_WORK_TYPE["painting"]
+
+
 class WikidataEnricher:
     """Add medium / institution / inception_year to verified references
     that have a `wikipedia_url`. Independent of the verifier; the
@@ -150,19 +173,12 @@ class WikidataEnricher:
         claims = await self._fetch_claims(http, qid)
         if claims is None:
             return r
-        medium_qid = self._claim_qid(claims.get("P186", []))
-        # P276 (location) is the institution for artworks. P915 (filming location) and P272
-        # (production company) are film-specific. Try P276 first, fall back to P272.
-        institution_qid = (
-            self._claim_qid(claims.get("P276", []))
-            or self._claim_qid(claims.get("P272", []))
-        )
-        # P571 (inception) covers artworks/organisations. Creative works like films and
-        # music videos use P577 (publication date) instead. Try P571 first, fall back to P577.
-        inception = (
-            self._claim_inception(claims.get("P571", []))
-            or self._claim_inception(claims.get("P577", []))
-        )
+
+        props = _PROPS_BY_WORK_TYPE.get(r.work_type, _DEFAULT_PROPS)
+        medium_qid = self._first_claim_qid(claims, props["medium"])
+        institution_qid = self._first_claim_qid(claims, props["institution"])
+        inception = self._first_inception(claims, props["inception"])
+
         labels_to_resolve = [q for q in (medium_qid, institution_qid) if q]
         labels = (
             await self._resolve_labels(http, labels_to_resolve)
@@ -174,6 +190,24 @@ class WikidataEnricher:
             "institution": labels.get(institution_qid) if institution_qid else None,
             "inception_year": inception,
         })
+
+    def _first_claim_qid(
+        self, claims: dict[str, list], p_codes: list[str]
+    ) -> str | None:
+        for p in p_codes:
+            qid = self._claim_qid(claims.get(p, []))
+            if qid:
+                return qid
+        return None
+
+    def _first_inception(
+        self, claims: dict[str, list], p_codes: list[str]
+    ) -> int | None:
+        for p in p_codes:
+            v = self._claim_inception(claims.get(p, []))
+            if v is not None:
+                return v
+        return None
 
     async def _fetch_qid(self, http: httpx.AsyncClient, slug: str) -> str | None:
         r = await http.get(_WIKIPEDIA_API, params={
