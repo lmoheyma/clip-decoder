@@ -233,7 +233,6 @@ html, body {
   border-color: var(--ink);
 }
 .slate .sep { flex: 1; height: 1px; background: transparent; }
-.slate .tc  { color: var(--muted); font-size: 13px; letter-spacing: 0.13px; }
 .slate b {
   color: var(--ink);
   font-family: var(--serif);
@@ -969,7 +968,7 @@ html, body {
 /* ─── Slate context label (e.g. "Report") ────── */
 .slate-context {
   color: var(--body);
-  font-family: var(--mono);
+  font-family: var(--body);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;

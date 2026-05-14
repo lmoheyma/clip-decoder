@@ -127,9 +127,6 @@ export function ReportContent({
         <b>ClipDecoder</b>
         <span className="slate-context">Report</span>
         <span className="sep" />
-        <button type="button" className="slate-link" onClick={shareLink}>
-          {shareToast ? "Link copied" : "Share ↗"}
-        </button>
         <a
           className="slate-link"
           href={`/api/report/${report.youtube_id}`}
@@ -152,7 +149,7 @@ export function ReportContent({
 
       <header className="report-header">
         <h1 className="report-h1">
-          A clip you&apos;d<br />like{" "}
+          A clip you&apos;d like{" "}
           <em className="report-h1-em">decoded.</em>
         </h1>
         <h2 className="report-title">{report.title}</h2>

@@ -69,7 +69,7 @@ export function PipelinePage({
           <h1 className="pipeline-h1" role="alert">
             {error}
           </h1>
-          <Link className="not-found-cta" href="/" style={{ marginTop: 32, display: "inline-flex" }}>
+          <Link className="not-found-cta" href="/" style={{ marginTop: 32 }}>
             ← Try another clip
           </Link>
         </div>
