@@ -27,18 +27,27 @@ export function DetailReasoning({
     <div className="detail-reasoning">
       <div className="h">EVIDENCE CHAIN · CROSS-REFERENCE → VERIFY</div>
       <p className="pull-quote">{pull}</p>
-      <p>
-        <span className="label">Cross-reference pass.</span>
-        {crossRef}
-      </p>
-      <p>
-        <span className="label">Adversarial pass.</span>
-        {adversarial}
-      </p>
-      <p>
-        <span className="label">Wikipedia.</span>
-        {wikipedia}
-      </p>
+      <section className="pass pass-crossref">
+        <header>
+          <span className="num">01</span>
+          <span className="lbl">Cross-reference pass</span>
+        </header>
+        <p>{crossRef}</p>
+      </section>
+      <section className="pass pass-adversarial">
+        <header>
+          <span className="num">02</span>
+          <span className="lbl">Adversarial pass</span>
+        </header>
+        <p>{adversarial}</p>
+      </section>
+      <section className="pass pass-wikipedia">
+        <header>
+          <span className="num">03</span>
+          <span className="lbl">Wikipedia</span>
+        </header>
+        <p>{wikipedia}</p>
+      </section>
     </div>
   );
 }

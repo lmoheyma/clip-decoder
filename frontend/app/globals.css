@@ -1710,21 +1710,51 @@ html, body {
   color: var(--ink);
   border-left: 2px solid var(--grad-peach);
   padding-left: 16px;
-  margin: 0 0 18px;
+  margin: 0 0 22px;
 }
-.detail-reasoning p {
+/* Three editorial passes — each one a distinct section with a colored
+   left-rule, an eyebrow label (NUM · NAME), and breathing space between
+   blocks so the reader can scan the chain of evidence at a glance. */
+.detail-reasoning .pass {
+  border-left: 2px solid var(--hairline);
+  padding-left: 14px;
+  margin: 0 0 20px;
+}
+.detail-reasoning .pass:last-of-type { margin-bottom: 0; }
+.detail-reasoning .pass header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.detail-reasoning .pass header .num {
   font-family: var(--sans);
-  font-size: 14.5px;
-  line-height: 1.65;
-  color: var(--body-strong);
-  margin: 0 0 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.96px;
+  color: var(--muted);
 }
-.detail-reasoning p .label {
-  font-family: var(--serif);
-  font-style: italic;
+.detail-reasoning .pass header .lbl {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.96px;
+  text-transform: uppercase;
   color: var(--ink);
-  margin-right: 4px;
 }
+.detail-reasoning .pass p {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--body-strong);
+  margin: 0;
+}
+.detail-reasoning .pass-crossref { border-left-color: var(--grad-peach); }
+.detail-reasoning .pass-crossref .num { color: var(--grad-peach); }
+.detail-reasoning .pass-adversarial { border-left-color: var(--grad-sky); }
+.detail-reasoning .pass-adversarial .num { color: var(--grad-sky); }
+.detail-reasoning .pass-wikipedia { border-left-color: var(--grad-lavender); }
+.detail-reasoning .pass-wikipedia .num { color: var(--grad-lavender); }
 
 .detail-frame-analysis dl {
   display: grid;
