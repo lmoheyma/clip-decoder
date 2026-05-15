@@ -250,7 +250,10 @@ async def test_shots_event_includes_keyframes_list(tmp_path: Path):
 
     shots_events = [e for e in received if e.step == "shots"]
     assert shots_events, "No shots event found"
-    payload = shots_events[0].payload
+    # The orchestrator emits a "Detecting scenes…" placeholder before the
+    # sampler call and then the populated shots event after it; the
+    # keyframes payload is on the final one.
+    payload = shots_events[-1].payload
     assert "shot_count" in payload
     assert "keyframes" in payload, f"keyframes missing from shots payload: {payload}"
     kfs = payload["keyframes"]
