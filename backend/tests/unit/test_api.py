@@ -40,6 +40,24 @@ async def test_analyze_returns_running_for_new_url(client):
     assert orch_run.await_count >= 1
 
 
+async def test_analyze_creates_pending_row_before_returning(client):
+    # Regression: /api/analyze used to schedule the orchestrator and return
+    # immediately, without writing any DB row. The frontend redirects to
+    # /report/{id} the instant the response lands and probes /api/status —
+    # if the orchestrator hadn't yet awaited set_status(RUNNING), the probe
+    # saw no row and the UI flipped to "No report with that id." Fix: the
+    # row must exist (as PENDING) before /analyze returns.
+    c, db, orch_run, bus = client
+    r = await c.post(
+        "/api/analyze",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    )
+    assert r.status_code == 200
+    s = await c.get("/api/status/dQw4w9WgXcQ")
+    assert s.status_code == 200
+    assert s.json()["status"] in ("pending", "running")
+
+
 async def test_analyze_returns_cached_when_done(client):
     c, db, orch_run, bus = client
     report = Report(

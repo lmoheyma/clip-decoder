@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import logging
 from app.api.sse import EventBus
 from app.db import AnalysisStatus, Database
@@ -49,7 +50,11 @@ class Orchestrator:
 
     async def run(self, url: str) -> None:
         try:
-            ingest = self._ingestor.ingest(url)
+            # yt-dlp is blocking (download + extract) — offload to a worker
+            # thread so the event loop stays responsive. Otherwise every
+            # backend handler (incl. /api/status and /api/stream the freshly
+            # redirected report page is waiting on) hangs until this returns.
+            ingest = await asyncio.to_thread(self._ingestor.ingest, url)
         except Exception as e:
             logger.exception("ingest failed")
             msg = str(e) or type(e).__name__
@@ -83,7 +88,15 @@ class Orchestrator:
                 },
             )
 
-            keyframes = self._sampler.sample(ingest.video_path, youtube_id=yid)
+            # Announce the Shots step before the (multi-second) sampler call
+            # so the UI marks the band active during detection. Without this
+            # the pipeline list sits silent between "Downloaded …" and
+            # "Detected N shots".
+            await self._emit(yid, "shots", "Detecting scenes…", progress=0.12)
+            # pyscenedetect / OpenCV is CPU-bound and blocking — also offload.
+            keyframes = await asyncio.to_thread(
+                self._sampler.sample, ingest.video_path, youtube_id=yid
+            )
             await self._emit(
                 yid, "shots",
                 f"Detected {len(keyframes)} shots",

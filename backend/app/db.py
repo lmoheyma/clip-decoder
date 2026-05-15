@@ -56,7 +56,8 @@ class Database:
             await conn.run_sync(Base.metadata.create_all)
 
     async def mark_orphans_as_error(self, message: str) -> int:
-        """Mark any rows stuck in RUNNING (server died mid-pipeline) as ERROR.
+        """Mark any rows stuck in PENDING or RUNNING (server died before the
+        orchestrator finished) as ERROR.
 
         Returns the number of rows updated. Called on startup so the
         frontend's pipeline page doesn't hang on a permanently-idle SSE
@@ -66,7 +67,11 @@ class Database:
         async with self._session() as s:
             stmt = (
                 update(AnalysisRow)
-                .where(AnalysisRow.status == AnalysisStatus.RUNNING.value)
+                .where(
+                    AnalysisRow.status.in_(
+                        [AnalysisStatus.PENDING.value, AnalysisStatus.RUNNING.value]
+                    )
+                )
                 .values(status=AnalysisStatus.ERROR.value, error=message)
             )
             result = await s.execute(stmt)

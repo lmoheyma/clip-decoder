@@ -52,6 +52,12 @@ def build_router(
             status = await db.get_status(yid)
             if status == AnalysisStatus.DONE:
                 return AnalyzeResponse(youtube_id=yid, status="cached")
+        # Mark PENDING synchronously before returning. The orchestrator's
+        # set_status(RUNNING) only fires after a slow yt-dlp ingest, so
+        # without this row the frontend's status probe (it redirects to
+        # /report/{id} the instant /analyze responds) would see no record
+        # and render "No report with that id."
+        await db.set_status(yid, AnalysisStatus.PENDING)
         # Schedule pipeline run; fire-and-forget. The bus carries progress.
         asyncio.create_task(run_pipeline(body.url))
         return AnalyzeResponse(
@@ -99,6 +105,15 @@ def build_router(
 
     @router.get("/stream/{youtube_id}")
     async def stream(youtube_id: str):
+        # The Next.js dev proxy gzips text/event-stream responses despite
+        # `compress: false`, which buffers chunks and starves the live SSE
+        # display. `Cache-Control: no-transform` is the RFC-7234 signal
+        # forbidding intermediaries from re-encoding; X-Accel-Buffering is
+        # the nginx-family convention for the same intent.
+        headers = {
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        }
         async def gen():
             # If the orchestrator is no longer alive for this id (server
             # restarted after the run finished or errored, or this id was
@@ -135,6 +150,6 @@ def build_router(
             async for ev in bus.subscribe(youtube_id):
                 yield {"event": ev.step, "data": ev.model_dump_json()}
 
-        return EventSourceResponse(gen())
+        return EventSourceResponse(gen(), headers=headers)
 
     return router
