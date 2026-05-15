@@ -35,7 +35,7 @@ export function classifySteps(events: PipelineEvent[]): StepInfo[] {
 
   const visionFrameCount = events.filter((e) => e.step === "vision_frame").length;
   const totalShots =
-    (events.find((e) => e.step === "shots")?.payload as { shot_count?: number } | undefined)
+    (events.findLast((e) => e.step === "shots")?.payload as { shot_count?: number } | undefined)
       ?.shot_count;
   const crossrefCandidates = events.filter(
     (e) => e.step === "crossref_candidate",

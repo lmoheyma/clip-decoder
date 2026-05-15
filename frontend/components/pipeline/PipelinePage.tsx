@@ -37,10 +37,11 @@ export function PipelinePage({
   }, [events]);
 
   const keyframes = useMemo(() => {
-    const shots = events.find((e) => e.step === "shots");
-    return shots
-      ? (shots.payload as unknown as ShotsPayload).keyframes
-      : [];
+    // Use findLast: the orchestrator emits an early "Detecting scenes…"
+    // shots event with no payload, then the final shots event with the
+    // full keyframes array. We want the latter.
+    const shots = events.findLast((e) => e.step === "shots");
+    return (shots?.payload as ShotsPayload | undefined)?.keyframes ?? [];
   }, [events]);
 
   const visionFrames = useMemo(

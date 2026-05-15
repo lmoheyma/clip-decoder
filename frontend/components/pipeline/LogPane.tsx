@@ -40,10 +40,15 @@ export function buildLogLines(events: PipelineEvent[]): LogLine[] {
       });
     } else if (e.step === "shots") {
       const p = e.payload as { shot_count?: number };
+      // Early "Detecting scenes…" emit has no shot_count yet — surface the
+      // event message instead so the log shows progress during sampling.
       lines.push({
         t,
         lvl: "shots",
-        text: `→ ${p.shot_count ?? 0} boundaries · keyframes capped at 80`,
+        text:
+          typeof p.shot_count === "number"
+            ? `→ ${p.shot_count} boundaries · keyframes capped at 80`
+            : e.message,
       });
     } else if (e.step === "vision_frame") {
       const p = e.payload as { frame_id: string; raw_description: string };
