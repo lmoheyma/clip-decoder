@@ -1,5 +1,7 @@
 # ClipDecoder
 
+> ⚠️ **Work in progress.** This repository is public for transparency, but the project is still under active development. Interfaces, data layout, and pipeline behaviour can change without notice; expect rough edges and breaking commits on `main`.
+
 Local-first tool that decodes the visual references in YouTube music videos using NVIDIA NIM endpoints.
 
 ## Quick start
