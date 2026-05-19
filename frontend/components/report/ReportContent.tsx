@@ -11,7 +11,7 @@ import { VideoPlayer, type VideoPlayerHandle } from "@/components/VideoPlayer";
 import { FilterBar } from "@/components/FilterBar";
 import { SummaryCard } from "@/components/SummaryCard";
 import { ReferenceCard } from "@/components/ReferenceCard";
-import { BrandMark } from "@/components/BrandMark";
+import { BrandLink } from "@/components/BrandLink";
 
 function formatDuration(s: number): string {
   const t = Math.floor(s);
@@ -128,10 +128,7 @@ export function ReportContent({
   function Slate() {
     return (
       <div className="slate relative z-[2] flex items-center gap-[18px] px-[clamp(28px,4vw,56px)] py-[22px] max-sm:px-5 max-sm:py-[14px] max-sm:gap-3 font-sans text-sm text-body tracking-[0.14px]">
-        <BrandMark />
-        <b className="font-serif not-italic font-normal text-[22px] leading-none tracking-[-0.015em] text-ink [font-variation-settings:'SOFT'_100]">
-          ClipDecoder
-        </b>
+        <BrandLink />
         <span className="max-sm:hidden font-sans text-[11px] uppercase tracking-[0.14em] text-body pl-[18px] ml-1.5 border-l border-hairline-soft">
           Report
         </span>

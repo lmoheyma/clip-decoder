@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BrandMark } from "@/components/BrandMark";
+import { BrandLink } from "@/components/BrandLink";
 
 export default function ReportNotFound() {
   return (
@@ -10,10 +10,7 @@ export default function ReportNotFound() {
 
       <div className="relative z-[2] flex flex-col flex-1 min-h-0">
         <div className="slate relative z-[2] flex items-center gap-[18px] px-[clamp(28px,4vw,56px)] py-[22px] max-sm:px-5 max-sm:py-[14px] max-sm:gap-3 font-sans text-sm text-body tracking-[0.14px]">
-          <BrandMark />
-          <b className="font-serif not-italic font-normal text-[22px] leading-none tracking-[-0.015em] text-ink [font-variation-settings:'SOFT'_100]">
-            ClipDecoder
-          </b>
+          <BrandLink />
           <span className="flex-1 h-px" />
         </div>
 

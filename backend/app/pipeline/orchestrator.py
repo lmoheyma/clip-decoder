@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+import httpx
 from app.api.sse import EventBus
 from app.db import AnalysisStatus, Database
 from app.models import PipelineEvent, Report, VerifiedReference
@@ -244,7 +245,19 @@ class Orchestrator:
             )
         except Exception as e:
             logger.exception("pipeline failed")
-            msg = str(e) or type(e).__name__
+            # NIM (NVIDIA) regularly times out under load. The httpx
+            # exceptions surface here with empty str(e), so map them to a
+            # friendly message the UI can show instead of "ReadTimeout".
+            if isinstance(
+                e,
+                (httpx.ReadTimeout, httpx.ConnectError, httpx.RemoteProtocolError),
+            ):
+                msg = (
+                    "NVIDIA NIM is taking too long to respond. "
+                    "Please retry in a few minutes."
+                )
+            else:
+                msg = str(e) or type(e).__name__
             await self._db.set_status(yid, AnalysisStatus.ERROR, error=msg)
             await self._emit(yid, "error", msg, progress=0.0)
         finally:
