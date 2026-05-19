@@ -94,28 +94,33 @@ export function LogPane({ events }: { events: PipelineEvent[] }) {
   }, [lines.length]);
 
   return (
-    <div className="log-pane">
-      <h3>
-        <span className="live">Live log — NIM stream</span>
+    <div className="rounded-2 border border-hairline bg-surface-card p-4 font-sans text-[12px]">
+      <h3 className="flex justify-between items-center m-0 mb-3 font-sans text-[11px] font-medium uppercase tracking-uc text-muted">
+        <span className="text-ink">Live log — NIM stream</span>
         <span>tail · auto-scroll</span>
       </h3>
-      <div className="log" ref={logRef}>
+      <div
+        ref={logRef}
+        className="flex flex-col gap-1 max-h-[200px] overflow-y-auto font-sans text-[12px] leading-[1.5]"
+      >
         {lines.length === 0 ? (
-          <div>
-            <span className="lvl">log</span>
-            <span className="v">Awaiting first event…</span>
+          <div className="flex items-baseline gap-2 text-body">
+            <span className="shrink-0 min-w-[56px] text-[10px] uppercase tracking-uc text-muted">log</span>
+            <span className="text-body">Awaiting first event…</span>
           </div>
         ) : (
           lines.map((line, i) => (
-            <div key={i}>
-              <span className="t">{line.t}</span>
+            <div key={i} className="flex items-baseline gap-2 text-body">
+              <span className="shrink-0 text-muted [font-variant-numeric:tabular-nums]">{line.t}</span>
               <span
-                className={`lvl ${line.isCandidate ? "candidate" : ""} ${line.isError ? "error" : ""}`}
+                className={`shrink-0 min-w-[56px] text-[10px] uppercase tracking-uc ${
+                  line.isCandidate ? "text-grad-peach" : line.isError ? "text-error" : "text-muted"
+                }`}
               >
                 {line.lvl}
               </span>
-              {line.text && <span className="v">{line.text}</span>}
-              {line.quote && <span className="q">{line.quote}</span>}
+              {line.text && <span className="text-body">{line.text}</span>}
+              {line.quote && <span className="italic text-body-strong">{line.quote}</span>}
             </div>
           ))
         )}

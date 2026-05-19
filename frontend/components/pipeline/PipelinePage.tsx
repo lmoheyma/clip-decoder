@@ -60,17 +60,23 @@ export function PipelinePage({
 
   if (error) {
     return (
-      <main className="frame surface-dark relative min-h-screen flex flex-col pipeline-root">
+      <main className="relative isolate min-h-screen flex flex-col overflow-hidden bg-canvas text-ink pipeline-root">
         <div aria-hidden className="aurora aurora-report" />
         <div aria-hidden className="aurora aurora-report-b" />
         <div aria-hidden className="grain" />
         <PipelineSlate youtubeId={youtubeId} startTs={startTs} />
-        <div style={{ padding: "clamp(48px, 6vw, 80px)", maxWidth: 760, position: "relative", zIndex: 1 }}>
-          <div className="pipeline-eyebrow">Pipeline error</div>
-          <h1 className="pipeline-h1" role="alert">
+        <div className="relative z-[1] max-w-[760px] p-[clamp(48px,6vw,80px)]">
+          <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-error mb-6">Pipeline error</div>
+          <h1
+            role="alert"
+            className="m-0 font-serif font-light text-ink leading-[0.96] tracking-[-0.025em] text-[clamp(40px,5.4vw,80px)] [font-variation-settings:'SOFT'_100]"
+          >
             {error}
           </h1>
-          <Link className="not-found-cta" href="/" style={{ marginTop: 32 }}>
+          <Link
+            href="/"
+            className="inline-block mt-8 px-[22px] py-3 rounded-full border border-hairline-strong font-sans text-[11px] uppercase tracking-[0.14em] text-body no-underline transition-colors duration-200 hover:text-ink hover:border-ink"
+          >
             ← Try another clip
           </Link>
         </div>
@@ -79,16 +85,16 @@ export function PipelinePage({
   }
 
   return (
-    <main className="frame surface-dark relative min-h-screen flex flex-col pipeline-root">
+    <main className="relative isolate min-h-screen flex flex-col overflow-hidden bg-canvas text-ink pipeline-root">
       <div aria-hidden className="aurora aurora-report" />
       <div aria-hidden className="aurora aurora-report-b" />
       <div aria-hidden className="grain" />
       <PipelineSlate youtubeId={youtubeId} startTs={startTs} />
 
-      <div className="pipeline-stage">
-        <div className="pipeline-col-left">
-          <h2 className="pipeline-h2">
-            <em>Reading</em>
+      <div className="relative z-[1] grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)_320px] gap-6 pt-[clamp(28px,4vw,48px)] px-[clamp(32px,5vw,64px)] pb-8">
+        <div className="flex flex-col gap-4 min-w-0">
+          <h2 className="m-0 mb-7 font-serif font-light text-ink leading-[0.96] tracking-[-0.025em] text-[clamp(38px,4.4vw,64px)] [font-variation-settings:'SOFT'_100]">
+            <em className="italic font-normal text-grad-lavender">Reading</em>
             <br />
             the tape.
           </h2>
@@ -96,7 +102,7 @@ export function PipelinePage({
           <PipelineList events={events} />
         </div>
 
-        <div className="pipeline-col-center">
+        <div className="flex flex-col gap-4 min-w-0">
           <NowFrame frame={lastVisionFrame} youtubeId={youtubeId} />
           <KeyframeStrip
             keyframes={keyframes}
@@ -107,7 +113,7 @@ export function PipelinePage({
           <LogPane events={events} />
         </div>
 
-        <div className="pipeline-col-right">
+        <div className="flex flex-col gap-4 min-w-0">
           <CandidatesPane events={events} />
         </div>
       </div>

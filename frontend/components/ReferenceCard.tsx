@@ -9,14 +9,42 @@ function formatTimecode(s: number): string {
   return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
 }
 
-const VERDICT_META: Record<
-  string,
-  { label: string; icon: string; chipExtra: string; confExtra: string }
-> = {
-  confirmed: { label: "CONFIRMED", icon: "●", chipExtra: "", confExtra: "" },
-  speculative: { label: "SPECULATIVE", icon: "◌", chipExtra: "chip-cyan", confExtra: "conf-cyan" },
-  hidden: { label: "HIDDEN", icon: "✕", chipExtra: "chip-dim", confExtra: "conf-rose" },
+const CHIP_TAG_BASE =
+  "inline-flex items-center gap-2 px-3 py-[5px] rounded-full border font-sans text-[12px] font-semibold uppercase tracking-uc";
+
+const CHIP_TAG_VARIANT: Record<string, string> = {
+  confirmed: "bg-surface-strong border-hairline text-body",
+  speculative:
+    "bg-[color:color-mix(in_oklab,var(--grad-sky)_16%,var(--surface-strong))] border-[color:color-mix(in_oklab,var(--grad-sky)_30%,transparent)] text-grad-sky",
+  hidden: "bg-surface-strong border-hairline text-muted",
 };
+
+const VERDICT_BORDER: Record<string, string> = {
+  confirmed: "border-l-grad-peach",
+  speculative: "border-l-grad-sky opacity-95",
+  hidden: "border-l-error opacity-70",
+};
+
+const VERDICT_MARKER: Record<string, string> = {
+  confirmed: "text-grad-peach",
+  speculative: "text-grad-sky",
+  hidden: "text-error",
+};
+
+const CONF_BAR_FILL: Record<string, string> = {
+  confirmed: "bg-grad-peach",
+  speculative: "bg-grad-sky",
+  hidden: "bg-error",
+};
+
+const VERDICT_META: Record<string, { label: string; icon: string }> = {
+  confirmed: { label: "CONFIRMED", icon: "●" },
+  speculative: { label: "SPECULATIVE", icon: "◌" },
+  hidden: { label: "HIDDEN", icon: "✕" },
+};
+
+const ULINK =
+  "font-sans text-[11px] font-medium uppercase tracking-uc text-ink no-underline border-b border-hairline-strong pb-0.5 cursor-pointer transition-[border-color] duration-200 hover:border-ink";
 
 export function ReferenceCard({
   reference,
@@ -41,37 +69,40 @@ export function ReferenceCard({
   const detailHref = `/report/${youtubeId}/ref/${index}`;
 
   return (
-    <article className={`ref ref-${verdict}`}>
-      {/* Visual region — clickable Link to the detail page. */}
+    <article
+      className={`ref relative grid grid-cols-1 sm:grid-cols-[1fr_1.4fr] gap-4 p-4 bg-surface-card border border-hairline border-l-2 rounded-2 cursor-pointer transition-colors duration-200 hover:border-hairline-strong focus-within:outline focus-within:outline-2 focus-within:outline-grad-peach focus-within:outline-offset-4 focus-within:rounded-2 ${VERDICT_BORDER[verdict]}`}
+    >
+      {/* Visual region — clickable Link to the detail page.
+          `contents` so the link participates in the parent's grid layout. */}
       <Link
         href={detailHref}
-        className="ref-link"
+        className="contents text-inherit no-underline"
         aria-label={`Open detail for ${reference.work_title} at ${tc}`}
       >
-        <div className="ref-left">
+        <div className="flex flex-col gap-1.5">
           <div
-            className="thumb"
+            className="aspect-video w-full bg-cover bg-center bg-surface-strong rounded-1 relative"
             style={{
               backgroundImage: `url(/api/frames/${youtubeId}/${reference.source_frame_id})`,
               filter: isHidden ? "grayscale(0.7) brightness(0.6)" : undefined,
             }}
           >
-            <span className="tc-overlay">
+            <span className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 font-sans text-[11px] font-medium uppercase tracking-uc text-ink rounded">
               {tc} · {reference.source_frame_id.toUpperCase()}
             </span>
           </div>
           {paletteHex.length > 0 && (
             <>
               <div
-                className="palette"
-                style={{ marginTop: 8, opacity: isHidden ? 0.4 : 1 }}
+                className="flex gap-1 h-6 mt-2"
+                style={{ opacity: isHidden ? 0.4 : 1 }}
               >
                 {paletteHex.map((hex, i) => (
-                  <span key={i} style={{ background: hex }} />
+                  <span key={i} className="flex-1 h-full rounded" style={{ background: hex }} />
                 ))}
               </div>
               {paletteDescriptors.length > 0 && (
-                <div className="hairline palette-label">
+                <div className="mt-1.5 font-sans font-semibold uppercase text-[11px] tracking-[0.88px] text-muted">
                   PALETTE · {paletteDescriptors.join(" → ").toUpperCase()}
                 </div>
               )}
@@ -79,9 +110,9 @@ export function ReferenceCard({
           )}
         </div>
 
-        <div className="ref-right">
-          <div className="ref-verdict-line">
-            <span className={`verdict-marker verdict-${verdict}`}>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 font-sans text-[11px] uppercase tracking-uc text-muted">
+            <span className={`font-semibold ${VERDICT_MARKER[verdict]}`}>
               {meta.icon} {meta.label}
             </span>
             <span>·</span>
@@ -94,17 +125,17 @@ export function ReferenceCard({
             )}
           </div>
 
-          <div className="ref-title-row">
+          <div className="flex justify-between items-start gap-3">
             <h3
-              className={`serif-it ref-title ${isHidden ? "ref-title-rejected" : ""}`}
+              className={`m-0 font-serif font-light not-italic text-ink leading-[1.2] tracking-[-0.15px] text-[clamp(17px,1.5vw,22px)] ${isHidden ? "line-through decoration-error decoration-1" : ""}`}
             >
-              <em>{reference.work_title}</em>
+              <em className="italic">{reference.work_title}</em>
             </h3>
             {reference.wikipedia_thumbnail_url && (
               <img
                 src={reference.wikipedia_thumbnail_url}
                 alt=""
-                className="wiki-thumb"
+                className="w-[60px] h-[60px] rounded-1 object-cover opacity-85 shrink-0 transition-opacity duration-200 hover:opacity-100"
                 loading="lazy"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
@@ -113,27 +144,29 @@ export function ReferenceCard({
             )}
           </div>
 
-          <div className="ref-meta">
+          <div className="font-sans text-[11px] uppercase tracking-uc text-muted">
             {reference.work_creator} · {reference.work_year ?? "—"} ·{" "}
             {reference.work_type}
           </div>
 
-          <p className="ref-reasoning">{reference.cross_ref_reasoning}</p>
+          <p className="m-0 font-sans text-[13px] leading-[1.5] text-body max-w-[60ch] line-clamp-3">
+            {reference.cross_ref_reasoning}
+          </p>
 
           {reference.supporting_elements.length > 0 && (
-            <div className="ev">
+            <div className="flex flex-wrap gap-1.5">
               {reference.supporting_elements.map((el, i) => (
-                <span key={i} className={`chip ${meta.chipExtra}`}>
+                <span key={i} className={`${CHIP_TAG_BASE} ${CHIP_TAG_VARIANT[verdict] ?? CHIP_TAG_VARIANT.confirmed}`}>
                   {el}
                 </span>
               ))}
             </div>
           )}
 
-          <div className={`conf ${meta.confExtra}`}>
+          <div className="flex items-center gap-3 font-sans text-[11px] uppercase tracking-uc text-muted">
             <span>CONFIDENCE</span>
-            <span className="bar">
-              <i style={{ width: `${confPercent}%` }} />
+            <span className="flex-1 h-0.5 bg-hairline rounded-full overflow-hidden">
+              <i className={`block h-full ${CONF_BAR_FILL[verdict]}`} style={{ width: `${confPercent}%` }} />
             </span>
             <span>{reference.raw_confidence.toFixed(2)}</span>
           </div>
@@ -142,17 +175,13 @@ export function ReferenceCard({
 
       {/* Action row — sits outside the Link so anchors/buttons here do not
           nest inside another <a>. */}
-      <div className="ref-actions">
-        <button
-          type="button"
-          className="ulink"
-          onClick={onJump}
-        >
+      <div className="flex flex-wrap items-center gap-3.5 mt-1.5">
+        <button type="button" className={ULINK} onClick={onJump}>
           ▸ JUMP TO {tc}
         </button>
         {reference.wikipedia_url && (
           <a
-            className="ulink"
+            className={ULINK}
             href={reference.wikipedia_url}
             target="_blank"
             rel="noopener noreferrer"

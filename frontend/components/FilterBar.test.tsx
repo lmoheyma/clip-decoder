@@ -31,7 +31,7 @@ describe("FilterBar", () => {
     expect(onToggleType).not.toHaveBeenCalled();
   });
 
-  it("default selection marks hidden chip as chip-off", () => {
+  it("default selection marks hidden chip as inactive via aria-pressed", () => {
     render(
       <FilterBar
         verdictCounts={verdictCounts}
@@ -44,9 +44,9 @@ describe("FilterBar", () => {
       />,
     );
     const hiddenChip = screen.getByRole("button", { name: /hidden/i });
-    expect(hiddenChip.className).toContain("chip-off");
+    expect(hiddenChip).toHaveAttribute("aria-pressed", "false");
     const confirmedChip = screen.getByRole("button", { name: /confirmed/i });
-    expect(confirmedChip.className).toContain("chip-on");
+    expect(confirmedChip).toHaveAttribute("aria-pressed", "true");
   });
 
   it("toggle work_type chip is independent from verdict chips", () => {

@@ -3,6 +3,12 @@ import Link from "next/link";
 import type { VerifiedReference } from "@/lib/types";
 import { BrandMark } from "@/components/BrandMark";
 
+const NAV_LINK =
+  "font-mono text-[11px] uppercase tracking-[0.14em] text-body no-underline px-2.5 py-1 rounded-full border border-hairline-soft transition-colors duration-200 hover:text-ink hover:border-hairline-strong";
+
+const NAV_LINK_DISABLED =
+  "font-mono text-[11px] uppercase tracking-[0.14em] text-muted-soft no-underline px-2.5 py-1 rounded-full border border-hairline-soft cursor-not-allowed pointer-events-none";
+
 function formatTimecode(s: number): string {
   const t = Math.floor(s);
   const m = Math.floor(t / 60);
@@ -27,26 +33,28 @@ export function DetailSlate({
   const shotId = reference.source_frame_id.toUpperCase();
   const reportHref = `/report/${youtubeId}`;
   return (
-    <div className="slate detail-slate">
+    <div className="slate detail-slate relative z-[2] flex items-center gap-[18px] px-[clamp(28px,4vw,56px)] py-[22px] max-sm:px-5 max-sm:py-[14px] max-sm:gap-3 font-sans text-sm text-body tracking-[0.14px]">
       <BrandMark />
-      <b>ClipDecoder</b>
-      <span className="slate-context">
+      <b className="font-serif not-italic font-normal text-[22px] leading-none tracking-[-0.015em] text-ink [font-variation-settings:'SOFT'_100]">
+        ClipDecoder
+      </b>
+      <span className="max-sm:hidden font-sans text-[11px] uppercase tracking-[0.14em] text-body pl-[18px] ml-1.5 border-l border-hairline-soft">
         Focus · {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
       </span>
-      <span className="sep" />
-      <span className="slate-tc">{tc} · {shotId}</span>
-      <span className="detail-slate-nav">
+      <span className="flex-1 h-px" />
+      <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-body">{tc} · {shotId}</span>
+      <span className="inline-flex items-center gap-1.5 ml-4">
         {prevDisabled ? (
-          <span className="nav-link disabled" aria-disabled="true">← PREV</span>
+          <span className={NAV_LINK_DISABLED} aria-disabled="true">← PREV</span>
         ) : (
-          <Link className="nav-link" href={`/report/${youtubeId}/ref/${index - 1}`}>← PREV</Link>
+          <Link className={NAV_LINK} href={`/report/${youtubeId}/ref/${index - 1}`}>← PREV</Link>
         )}
         {nextDisabled ? (
-          <span className="nav-link disabled" aria-disabled="true">NEXT →</span>
+          <span className={NAV_LINK_DISABLED} aria-disabled="true">NEXT →</span>
         ) : (
-          <Link className="nav-link" href={`/report/${youtubeId}/ref/${index + 1}`}>NEXT →</Link>
+          <Link className={NAV_LINK} href={`/report/${youtubeId}/ref/${index + 1}`}>NEXT →</Link>
         )}
-        <Link className="nav-link" href={reportHref}>ESC</Link>
+        <Link className={NAV_LINK} href={reportHref}>ESC</Link>
       </span>
     </div>
   );

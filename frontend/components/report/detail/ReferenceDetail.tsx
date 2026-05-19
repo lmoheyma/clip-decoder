@@ -29,7 +29,7 @@ export function ReferenceDetail({
   const frame = frameById.get(reference.source_frame_id);
 
   return (
-    <main className="frame surface-dark relative min-h-screen flex flex-col detail-root">
+    <main className="relative isolate min-h-screen flex flex-col overflow-hidden bg-canvas text-ink detail-root">
       <div aria-hidden className="aurora aurora-report" />
       <div aria-hidden className="aurora aurora-report-b" />
       <div aria-hidden className="grain" />
@@ -39,7 +39,7 @@ export function ReferenceDetail({
         index={index}
         total={total}
       />
-      <div className="detail">
+      <div className="relative z-[1] grid gap-6 px-[clamp(32px,5vw,64px)] py-[clamp(32px,4vw,56px)]">
         <DetailTopRow reference={reference} />
         <DetailCompare
           reference={reference}
@@ -47,7 +47,7 @@ export function ReferenceDetail({
           youtubeId={youtubeId}
           frameIndex={index}
         />
-        <div className="detail-evidence">
+        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-6 max-[900px]:grid-cols-1">
           <DetailReasoning
             crossRef={reference.cross_ref_reasoning}
             adversarial={reference.adversarial_reasoning}

@@ -122,11 +122,15 @@ export function ReportContent({
 
   function Slate() {
     return (
-      <div className="slate">
+      <div className="slate relative z-[2] flex items-center gap-[18px] px-[clamp(28px,4vw,56px)] py-[22px] max-sm:px-5 max-sm:py-[14px] max-sm:gap-3 font-sans text-sm text-body tracking-[0.14px]">
         <BrandMark />
-        <b>ClipDecoder</b>
-        <span className="slate-context">Report</span>
-        <span className="sep" />
+        <b className="font-serif not-italic font-normal text-[22px] leading-none tracking-[-0.015em] text-ink [font-variation-settings:'SOFT'_100]">
+          ClipDecoder
+        </b>
+        <span className="max-sm:hidden font-sans text-[11px] uppercase tracking-[0.14em] text-body pl-[18px] ml-1.5 border-l border-hairline-soft">
+          Report
+        </span>
+        <span className="flex-1 h-px" />
         <a
           className="slate-link"
           href={`/api/report/${report.youtube_id}`}
@@ -140,36 +144,38 @@ export function ReportContent({
   }
 
   return (
-    <main className="frame surface-dark relative min-h-screen flex flex-col report-root">
+    <main className="relative isolate min-h-screen flex flex-col overflow-hidden bg-canvas text-ink report-root">
       <div aria-hidden className="aurora aurora-report" />
       <div aria-hidden className="aurora aurora-report-b" />
       <div aria-hidden className="grain" />
 
       <Slate />
 
-      <header className="report-header">
-        <h1 className="report-h1">
+      <header className="relative z-[1] flex flex-col px-[clamp(32px,5vw,64px)] pt-[clamp(48px,7vw,96px)] pb-[clamp(32px,4vw,48px)]">
+        <h1 className="m-0 font-serif font-light text-ink leading-[0.94] tracking-[-0.028em] text-[clamp(56px,7.6vw,112px)] [font-variation-settings:'SOFT'_100]">
           A clip you&apos;d like{" "}
-          <em className="report-h1-em">decoded.</em>
+          <em className="italic font-normal text-grad-lavender [font-variation-settings:'SOFT'_100]">decoded.</em>
         </h1>
-        <h2 className="report-title">{report.title}</h2>
-        <ul className="report-meta">
-          <li>{report.channel}</li>
-          <li>{formatDuration(report.duration_s)}</li>
-          <li>{stats.shots} shots</li>
-          <li>Analysed {formatDate(report.created_at)}</li>
+        <h2 className="font-serif italic font-normal text-body-strong mt-7 max-w-[760px] tracking-[-0.01em] text-[clamp(22px,2.4vw,32px)] [font-variation-settings:'SOFT'_80]">
+          {report.title}
+        </h2>
+        <ul className="list-none m-0 p-0 mt-8 flex flex-wrap gap-0 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">
+          <li className="px-4 first:pl-0 first:border-l-0 border-l border-hairline-soft">{report.channel}</li>
+          <li className="px-4 first:pl-0 first:border-l-0 border-l border-hairline-soft">{formatDuration(report.duration_s)}</li>
+          <li className="px-4 first:pl-0 first:border-l-0 border-l border-hairline-soft">{stats.shots} shots</li>
+          <li className="px-4 first:pl-0 first:border-l-0 border-l border-hairline-soft">Analysed {formatDate(report.created_at)}</li>
           {stats.wikiHits > 0 && (
-            <li>
-              Wiki <span className="meta-num">{stats.wikiHits}</span>/{stats.total}
+            <li className="px-4 first:pl-0 first:border-l-0 border-l border-hairline-soft">
+              Wiki <span className="text-ink font-medium">{stats.wikiHits}</span>/{stats.total}
             </li>
           )}
         </ul>
       </header>
 
-      <section className="player-row">
-        <div className="player-container">
+      <section className="relative z-[1] grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] items-start gap-8 px-[clamp(32px,5vw,64px)] pb-8">
+        <div className="flex flex-col gap-3">
           <VideoPlayer ref={playerRef} youtubeId={report.youtube_id} />
-          <p className="hairline">Click any reference card to seek the player</p>
+          <p className="font-sans text-[12px] font-semibold uppercase tracking-uc text-muted">Click any reference card to seek the player</p>
         </div>
         <SummaryCard stats={stats} />
       </section>
@@ -190,15 +196,10 @@ export function ReportContent({
         onToggleType={toggleType}
       />
 
-      <div className="grid">
+      <div className="ref-grid relative z-[1] grid gap-[18px] py-8 px-[clamp(32px,5vw,64px)] grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))]">
         {filteredRefs.length === 0 ? (
           <div
-            className="hairline"
-            style={{
-              gridColumn: "1/-1",
-              textAlign: "center",
-              padding: 48,
-            }}
+            className="font-sans text-[12px] font-semibold uppercase tracking-uc text-muted col-span-full text-center p-12"
           >
             All references filtered out. Re-enable a chip above.
           </div>

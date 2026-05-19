@@ -5,7 +5,7 @@ export function BrandMark({ size = 22 }: { size?: number }) {
       height={size}
       viewBox="0 0 32 32"
       aria-hidden
-      className="brand-mark"
+      className="block drop-shadow-[0_0_12px_color-mix(in_oklab,var(--grad-lavender)_35%,transparent)]"
     >
       <defs>
         <linearGradient id="brand-mark-aurora" x1="0" y1="0" x2="1" y2="1">
