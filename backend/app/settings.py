@@ -1,9 +1,11 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     nvapi_key: str = ""
     nim_base_url: str = "https://integrate.api.nvidia.com/v1"
