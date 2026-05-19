@@ -74,10 +74,12 @@ async def test_empty_candidates_list_is_ok():
     assert out == []
 
 
-async def test_propose_runs_two_passes_with_types_covered():
+async def test_propose_runs_pass1_and_pass2_in_parallel():
     nim = AsyncMock()
-    # First call (pass 1) returns one film candidate; second call (pass 2)
-    # should be told types_covered=film and return a painting candidate.
+    # Pass 1 returns a film candidate, pass 2 a painting. They now fan
+    # out concurrently, so we can no longer assert call order: assert
+    # that both calls happened and pass 2 was sent `(none)` for
+    # types_covered (since pass 1's types aren't available in time).
     nim.complete_text.side_effect = [
         {
             "candidates": [
@@ -111,12 +113,19 @@ async def test_propose_runs_two_passes_with_types_covered():
         title="x", channel="y", lyrics_text="",
         frame_analyses=[_fa("shot_03", 12.5), _fa("shot_07", 30.0)],
     )
-    # Both calls happened, in order
+    # Both calls happened
     assert nim.complete_text.await_count == 2
-    # Pass 2 received types_covered="film" inside its prompt
-    pass2_kwargs = nim.complete_text.await_args_list[1].kwargs
-    pass2_prompt = pass2_kwargs["messages"][0]["content"]
-    assert "Types already proposed by the previous pass: film" in pass2_prompt
+    # Pass 2 receives types_covered="(none)" since it runs in parallel
+    # with pass 1 and can't read its output.
+    prompts = [
+        call.kwargs["messages"][0]["content"]
+        for call in nim.complete_text.await_args_list
+    ]
+    pass2_prompt = next(
+        p for p in prompts
+        if "Types already proposed by the previous pass:" in p
+    )
+    assert "Types already proposed by the previous pass: (none)" in pass2_prompt
     # Both candidates surface
     titles = sorted(c.work_title for c in out)
     assert titles == ["Liberty Leading the People", "The Shining"]

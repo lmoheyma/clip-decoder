@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     frames_per_shot: int = 1
     max_shots_per_video: int = 80
-    nim_concurrency: int = 4
+    nim_concurrency: int = 8
     wikipedia_verification: bool = True
     # Wikidata enrichment for VerifiedReference (medium/institution/inception_year).
     # Independent of wikipedia_verification: a run can have Wikipedia URL/thumb

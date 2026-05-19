@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import logging
 from typing import Awaitable, Callable, Iterable
 from pydantic import ValidationError
@@ -87,30 +88,41 @@ class RefProposer:
             "frame_summaries": _format_frame_summaries(frame_analyses),
         }
         if on_progress:
-            await on_progress("Pass 1: asking LLM for general references…", 0.6)
-        pass1 = await self._call(self._tpl_general, base_ctx)
-        if on_progress:
-            await on_progress(f"Pass 1: {len(pass1)} candidates", 0.63)
-
-        types_covered = ", ".join(sorted({c.work_type for c in pass1})) or "(none)"
-        if on_progress:
             await on_progress(
-                f"Pass 2: asking LLM for complementary types "
-                f"(already covered: {types_covered})",
-                0.64,
+                "Pass 1 + 2: asking LLM for references in parallel…", 0.6,
             )
-        try:
-            pass2 = await self._call(
-                self._tpl_complement,
-                {**base_ctx, "types_covered": _escape_braces(types_covered)},
-            )
-        except Exception as e:
+
+        # Pass 1 and pass 2 run concurrently. Pass 2 used to read the set
+        # of types already proposed by pass 1 ({types_covered}) to steer
+        # toward uncovered types, but waiting for pass 1 to finish doubled
+        # the wall-clock cost of this step. We fan out both at once and
+        # pass `(none)` to pass 2 — the complement prompt's "all types
+        # open" branch — then rely on _merge()'s case-insensitive
+        # (title, creator) dedup to drop the overlapping candidates.
+        pass2_ctx = {**base_ctx, "types_covered": "(none)"}
+        pass1_task = asyncio.create_task(self._call(self._tpl_general, base_ctx))
+        pass2_task = asyncio.create_task(self._call(self._tpl_complement, pass2_ctx))
+
+        pass1_res, pass2_res = await asyncio.gather(
+            pass1_task, pass2_task, return_exceptions=True,
+        )
+        if isinstance(pass1_res, BaseException):
+            logger.error("ref proposer pass 1 failed: %s", pass1_res)
+            pass1 = []
+        else:
+            pass1 = pass1_res
+        if isinstance(pass2_res, BaseException):
             logger.warning(
-                "ref proposer pass 2 failed (%s) — keeping pass 1 only", e,
+                "ref proposer pass 2 failed (%s) — keeping pass 1 only",
+                pass2_res,
             )
             pass2 = []
+        else:
+            pass2 = pass2_res
         if on_progress:
-            await on_progress(f"Pass 2: {len(pass2)} additional candidates", 0.67)
+            await on_progress(
+                f"Pass 1: {len(pass1)} · Pass 2: {len(pass2)} candidates", 0.67,
+            )
 
         merged = _merge(pass1, pass2)
         if on_progress:
