@@ -41,6 +41,7 @@ export function ReportContent({
 }) {
   const [shareToast, setShareToast] = useState(false);
   const playerRef = useRef<VideoPlayerHandle>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
 
   const stats = useMemo(() => computeReportStats(report), [report]);
 
@@ -109,6 +110,10 @@ export function ReportContent({
 
   function jumpTo(ref: VerifiedReference) {
     playerRef.current?.seekTo(ref.timestamp_s);
+    playerContainerRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }
   async function shareLink() {
     try {
@@ -172,7 +177,10 @@ export function ReportContent({
         </ul>
       </header>
 
-      <section className="relative z-[1] grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] items-start gap-8 px-[clamp(32px,5vw,64px)] pb-8">
+      <section
+        ref={playerContainerRef}
+        className="relative z-[1] scroll-mt-6 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] items-start gap-8 px-[clamp(32px,5vw,64px)] pb-8"
+      >
         <div className="flex flex-col gap-3">
           <VideoPlayer ref={playerRef} youtubeId={report.youtube_id} />
           <p className="font-sans text-[12px] font-semibold uppercase tracking-uc text-muted">Click any reference card to seek the player</p>

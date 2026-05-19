@@ -10,7 +10,7 @@ function formatTimecode(s: number): string {
 }
 
 const CHIP_TAG_BASE =
-  "inline-flex items-center gap-2 px-3 py-[5px] rounded-full border font-sans text-[12px] font-semibold uppercase tracking-uc";
+  "inline-flex items-center gap-1.5 px-2 py-[2px] rounded-full border font-sans text-[10px] font-semibold uppercase tracking-[0.06em]";
 
 const CHIP_TAG_VARIANT: Record<string, string> = {
   confirmed: "bg-surface-strong border-hairline text-body",
@@ -70,15 +70,9 @@ export function ReferenceCard({
 
   return (
     <article
-      className={`ref relative grid grid-cols-1 sm:grid-cols-[1fr_1.4fr] gap-4 p-4 bg-surface-card border border-hairline border-l-2 rounded-2 cursor-pointer transition-colors duration-200 hover:border-hairline-strong focus-within:outline focus-within:outline-2 focus-within:outline-grad-peach focus-within:outline-offset-4 focus-within:rounded-2 ${VERDICT_BORDER[verdict]}`}
+      className={`ref relative grid grid-cols-1 sm:grid-cols-[1fr_1.4fr] gap-4 p-4 bg-surface-card border border-hairline border-l-2 rounded-2 transition-colors duration-200 hover:border-hairline-strong ${VERDICT_BORDER[verdict]}`}
     >
-      {/* Visual region — clickable Link to the detail page.
-          `contents` so the link participates in the parent's grid layout. */}
-      <Link
-        href={detailHref}
-        className="contents text-inherit no-underline"
-        aria-label={`Open detail for ${reference.work_title} at ${tc}`}
-      >
+      <div className="contents">
         <div className="flex flex-col gap-1.5">
           <div
             className="aspect-video w-full bg-cover bg-center bg-surface-strong rounded-1 relative"
@@ -171,11 +165,11 @@ export function ReferenceCard({
             <span>{reference.raw_confidence.toFixed(2)}</span>
           </div>
         </div>
-      </Link>
+      </div>
 
-      {/* Action row — sits outside the Link so anchors/buttons here do not
-          nest inside another <a>. */}
-      <div className="flex flex-wrap items-center gap-3.5 mt-1.5">
+      {/* Action row spans both grid columns so the Details link can sit
+          flush right while JUMP / WIKIPEDIA stay on the left. */}
+      <div className="sm:col-span-2 flex flex-wrap items-center gap-3.5 mt-1.5">
         <button type="button" className={ULINK} onClick={onJump}>
           ▸ JUMP TO {tc}
         </button>
@@ -189,6 +183,13 @@ export function ReferenceCard({
             WIKIPEDIA ↗
           </a>
         )}
+        <Link
+          href={detailHref}
+          className={`${ULINK} ml-auto`}
+          aria-label={`Open detail for ${reference.work_title} at ${tc}`}
+        >
+          DETAILS →
+        </Link>
       </div>
     </article>
   );

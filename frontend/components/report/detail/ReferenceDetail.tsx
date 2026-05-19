@@ -47,7 +47,7 @@ export function ReferenceDetail({
           youtubeId={youtubeId}
           frameIndex={index}
         />
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-6 max-[900px]:grid-cols-1">
+        <div className="grid items-start grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-6 max-[900px]:grid-cols-1">
           <DetailReasoning
             crossRef={reference.cross_ref_reasoning}
             adversarial={reference.adversarial_reasoning}
