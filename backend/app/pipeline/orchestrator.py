@@ -3,7 +3,7 @@ import asyncio
 import logging
 from app.api.sse import EventBus
 from app.db import AnalysisStatus, Database
-from app.models import PipelineEvent, Report
+from app.models import PipelineEvent, Report, VerifiedReference
 from app.nim.client import bind_nim_event_sink, unbind_nim_event_sink
 from app.pipeline.frame_analyzer import FrameAnalyzer
 from app.pipeline.ingestor import Ingestor
@@ -180,9 +180,24 @@ class Orchestrator:
             async def _on_verify_progress(msg: str, progress: float) -> None:
                 await self._emit(yid, "verify", msg, progress)
 
+            async def _on_verify_candidate(r: VerifiedReference) -> None:
+                await self._emit(
+                    yid, "verify_candidate",
+                    f"{r.work_title} → {r.final_confidence.value}",
+                    progress=0.0,
+                    payload={
+                        "source_frame_id": r.source_frame_id,
+                        "timestamp_s": r.timestamp_s,
+                        "work_title": r.work_title,
+                        "final_confidence": r.final_confidence.value,
+                    },
+                )
+
             frame_index = {fa.frame_id: fa for fa in frame_analyses}
             verified = await self._verifier.verify_all(
-                candidates, frame_index, on_progress=_on_verify_progress,
+                candidates, frame_index,
+                on_progress=_on_verify_progress,
+                on_candidate=_on_verify_candidate,
             )
 
             if self._enricher is not None:

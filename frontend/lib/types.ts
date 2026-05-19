@@ -54,6 +54,7 @@ export type PipelineStep =
   | "crossref"
   | "crossref_candidate"
   | "verify"
+  | "verify_candidate"
   | "nim_retry"
   | "done"
   | "error";
@@ -96,4 +97,11 @@ export interface CrossrefCandidatePayload {
   work_year: number | null;
   work_type: string;
   raw_confidence: number;
+}
+
+export interface VerifyCandidatePayload {
+  source_frame_id: string;
+  timestamp_s: number;
+  work_title: string;
+  final_confidence: Confidence;
 }

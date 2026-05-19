@@ -137,6 +137,7 @@ class Verifier:
         candidates: list[ReferenceCandidate],
         frame_index: dict[str, FrameAnalysis],
         on_progress: Callable[[str, float], Awaitable[None]] | None = None,
+        on_candidate: Callable[[VerifiedReference], Awaitable[None]] | None = None,
     ) -> list[VerifiedReference]:
         # return_exceptions=True so a single transient failure (e.g. NIM
         # 5xx that exhausted its retries) doesn't drop every successfully
@@ -160,6 +161,8 @@ class Verifier:
                         f"{res.work_title} → {bucket}",
                         p,
                     )
+                if on_candidate:
+                    await on_candidate(res)
             return res
 
         results = await asyncio.gather(
