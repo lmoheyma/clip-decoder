@@ -103,5 +103,6 @@ export interface VerifyCandidatePayload {
   source_frame_id: string;
   timestamp_s: number;
   work_title: string;
+  work_creator: string;
   final_confidence: Confidence;
 }

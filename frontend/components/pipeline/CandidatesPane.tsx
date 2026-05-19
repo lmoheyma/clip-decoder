@@ -28,10 +28,17 @@ function formatTimecode(s: number): string {
   return `${Math.floor(t / 60).toString().padStart(2, "0")}:${(t % 60).toString().padStart(2, "0")}`;
 }
 
-// Key candidates and their verified results by (source_frame_id, work_title)
-// so the verify event can replace the "awaiting" line on the right card.
-function candidateKey(c: { source_frame_id: string; work_title: string }): string {
-  return `${c.source_frame_id}::${c.work_title}`;
+// Key candidates and their verified results by
+// (source_frame_id, work_title, work_creator) so the verify event can
+// replace the "awaiting" line on the right card. Including work_creator
+// avoids collisions when two different works share a title from the
+// same frame (e.g. multiple adaptations of "Macbeth").
+function candidateKey(c: {
+  source_frame_id: string;
+  work_title: string;
+  work_creator: string;
+}): string {
+  return `${c.source_frame_id}::${c.work_title}::${c.work_creator}`;
 }
 
 export function CandidatesPane({ events }: { events: PipelineEvent[] }) {

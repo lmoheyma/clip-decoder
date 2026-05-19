@@ -99,6 +99,12 @@ class RefProposer:
         # pass `(none)` to pass 2 — the complement prompt's "all types
         # open" branch — then rely on _merge()'s case-insensitive
         # (title, creator) dedup to drop the overlapping candidates.
+        #
+        # Failure handling: pass 1 is load-bearing — its failure must
+        # surface to the orchestrator so a NIM timeout produces the
+        # friendly error message instead of a silent "0 candidates" run.
+        # Pass 2 is best-effort and only adds complement types, so a
+        # pass 2 failure is logged and we keep pass 1's results.
         pass2_ctx = {**base_ctx, "types_covered": "(none)"}
         pass1_task = asyncio.create_task(self._call(self._tpl_general, base_ctx))
         pass2_task = asyncio.create_task(self._call(self._tpl_complement, pass2_ctx))
@@ -107,10 +113,8 @@ class RefProposer:
             pass1_task, pass2_task, return_exceptions=True,
         )
         if isinstance(pass1_res, BaseException):
-            logger.error("ref proposer pass 1 failed: %s", pass1_res)
-            pass1 = []
-        else:
-            pass1 = pass1_res
+            raise pass1_res
+        pass1 = pass1_res
         if isinstance(pass2_res, BaseException):
             logger.warning(
                 "ref proposer pass 2 failed (%s) — keeping pass 1 only",

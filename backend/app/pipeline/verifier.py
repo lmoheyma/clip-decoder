@@ -146,9 +146,41 @@ class Verifier:
         completed = 0
         lock = asyncio.Lock()
 
+        def _synthetic_failure(c: ReferenceCandidate) -> VerifiedReference:
+            """Placeholder VerifiedReference used to resolve the live
+            CandidatesPane card when _verify_one raises. Marked HIDDEN so
+            the UI shows 'rejected ✕' instead of leaving the card in
+            'awaiting verify ◌' forever. Not added to the final report."""
+            return VerifiedReference(
+                **c.model_dump(),
+                verdict=Verdict.REJECT,
+                final_confidence=Confidence.HIDDEN,
+                supporting_elements=[],
+                wikipedia_url=None,
+                wikipedia_thumbnail_url=None,
+                cross_ref_reasoning="",
+                adversarial_reasoning="(verification failed)",
+                wikipedia_reasoning="",
+            )
+
         async def _wrapped(c: ReferenceCandidate) -> VerifiedReference:
             nonlocal completed
-            res = await self._verify_one(c, frame_index)
+            try:
+                res = await self._verify_one(c, frame_index)
+            except BaseException:
+                # Emit a synthetic verdict event so the live CandidatesPane
+                # card resolves; then re-raise so verify_all's gather
+                # collects the exception and skips this reference in the
+                # final report.
+                if on_candidate:
+                    try:
+                        await on_candidate(_synthetic_failure(c))
+                    except Exception:
+                        logger.exception(
+                            "on_candidate synthetic emit failed for %r",
+                            c.work_title,
+                        )
+                raise
             async with lock:
                 completed += 1
                 if on_progress:

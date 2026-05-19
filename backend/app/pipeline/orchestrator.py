@@ -190,6 +190,7 @@ class Orchestrator:
                         "source_frame_id": r.source_frame_id,
                         "timestamp_s": r.timestamp_s,
                         "work_title": r.work_title,
+                        "work_creator": r.work_creator,
                         "final_confidence": r.final_confidence.value,
                     },
                 )

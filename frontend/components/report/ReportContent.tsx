@@ -134,7 +134,7 @@ export function ReportContent({
         </span>
         <span className="flex-1 h-px" />
         <a
-          className="slate-link"
+          className="no-underline font-sans not-italic font-medium text-[15px] text-body transition-colors duration-200 hover:text-ink"
           href={`/api/report/${report.youtube_id}`}
           target="_blank"
           rel="noopener noreferrer"
