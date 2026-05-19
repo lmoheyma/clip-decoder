@@ -8,10 +8,11 @@ import type { Report } from "./types";
  *
  * Uses BACKEND_URL — the same env var that `next.config.ts` rewrites
  * /api/* to — so the rewrite target and the server-side fetch target
- * stay aligned. Defaults to the docker-compose service name.
+ * stay aligned. Defaults to localhost for host-machine dev; docker-compose
+ * overrides BACKEND_URL to point at the `backend` service hostname.
  */
 export async function fetchReportServer(youtubeId: string): Promise<Report | null> {
-  const base = process.env.BACKEND_URL ?? "http://backend:8000";
+  const base = process.env.BACKEND_URL ?? "http://localhost:8000";
   const r = await fetch(`${base}/api/report/${encodeURIComponent(youtubeId)}`, {
     cache: "no-store",
   });
