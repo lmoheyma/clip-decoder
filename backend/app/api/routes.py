@@ -30,6 +30,11 @@ class AnalyzeResponse(BaseModel):
     status_stream_url: str | None = None
 
 
+class StatusResponse(BaseModel):
+    status: str
+    error: str | None = None
+
+
 def build_router(
     *,
     db: Database,
@@ -48,10 +53,19 @@ def build_router(
             yid = parse_youtube_id(body.url)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        if not body.refresh:
-            status = await db.get_status(yid)
-            if status == AnalysisStatus.DONE:
-                return AnalyzeResponse(youtube_id=yid, status="cached")
+        status = await db.get_status(yid)
+        if not body.refresh and status == AnalysisStatus.DONE:
+            return AnalyzeResponse(youtube_id=yid, status="cached")
+        # Refuse to start a second run for an id that's already being
+        # processed — two concurrent pipelines for the same youtube_id
+        # race on frame files and the DB row. The client should
+        # subscribe to the existing SSE stream instead.
+        if status in (AnalysisStatus.PENDING, AnalysisStatus.RUNNING):
+            return AnalyzeResponse(
+                youtube_id=yid,
+                status="running",
+                status_stream_url=f"/api/stream/{yid}",
+            )
         # Mark PENDING synchronously before returning. The orchestrator's
         # set_status(RUNNING) only fires after a slow yt-dlp ingest, so
         # without this row the frontend's status probe (it redirects to
@@ -66,16 +80,16 @@ def build_router(
             status_stream_url=f"/api/stream/{yid}",
         )
 
-    @router.get("/status/{youtube_id}")
-    async def get_status(youtube_id: str) -> dict:
+    @router.get("/status/{youtube_id}", response_model=StatusResponse)
+    async def get_status(youtube_id: str) -> StatusResponse:
         """Lightweight status probe used by the report page to distinguish
         \"never analyzed\" (-> 404 in UI) from \"currently running\" (-> SSE
         subscription). Returns 'not_found' when no row exists at all."""
         status = await db.get_status(youtube_id)
         if status is None:
-            return {"status": "not_found", "error": None}
+            return StatusResponse(status="not_found", error=None)
         err = await db.get_error(youtube_id) if status == AnalysisStatus.ERROR else None
-        return {"status": status.value, "error": err}
+        return StatusResponse(status=status.value, error=err)
 
     @router.get("/report/{youtube_id}")
     async def get_report(youtube_id: str) -> dict:

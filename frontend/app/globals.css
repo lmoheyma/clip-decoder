@@ -1,31 +1,8 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────
-   Token surface — Tailwind v4 reads these as theme defaults.
-   Falls back to the values declared in tailwind.config.ts as well.
-   ───────────────────────────────────────────────────────────────── */
-:root {
-  --color-midnight: #010120;
-  --color-midnight-deep: #00000d;
-  --color-lavender: #bdbbff;
-  --color-magenta: #ef2cc1;
-  --color-orange: #fc4c02;
-  --color-mist: #f5f1ff;
-
-  --shadow-midnight: 0px 4px 10px rgba(1, 1, 32, 0.10);
-  --shadow-midnight-soft: 0px 24px 60px -20px rgba(1, 1, 32, 0.18);
-  --shadow-aurora:
-    0 0 0 1px rgba(189, 187, 255, 0.35),
-    0 24px 80px -20px rgba(239, 44, 193, 0.22),
-    0 24px 80px -20px rgba(252, 76, 2, 0.18);
-
-  --font-display: var(--font-bricolage), "The Future", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-plex-mono), "PP Neue Montreal Mono", ui-monospace, "SF Mono", Menlo, monospace;
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   SP1 — New design system tokens (editorial register).
-   Coexist with the legacy tokens above until SP2 drops them.
+   Design tokens — the editorial register.
+   Tailwind v4 picks these up via the @theme block below.
    ───────────────────────────────────────────────────────────────── */
 :root {
   /* Surface */

@@ -4,7 +4,13 @@ from pathlib import Path
 from typing import Any
 from yt_dlp import YoutubeDL
 
-from app.models import Caption, IngestResult
+from app.models import IngestResult
+
+# Resource ceiling per analysis. Public-deploy guard: prevents a
+# multi-hour livestream / 4 GB upload from blowing out disk + NIM
+# credits before downstream stages have a chance to bail.
+MAX_DURATION_S = 15 * 60  # 15 min
+MAX_FILESIZE_BYTES = 300 * 1024 * 1024  # 300 MB at 480p mp4
 
 
 _YT_ID_RE = re.compile(
@@ -30,9 +36,6 @@ class Ingestor:
 
     def _ydl_opts(self, youtube_id: str) -> dict[str, Any]:
         out_template = str(self._work_dir / f"{youtube_id}.%(ext)s")
-        # Captions are unused in v1 (_captions_from_info returns []);
-        # requesting them via writeautomaticsub triggers YouTube
-        # rate limiting (429) and crashes the whole ingest.
         return {
             "format": "best[height<=480][ext=mp4]/best[height<=480]/best[ext=mp4]/best",
             "outtmpl": out_template,
@@ -42,17 +45,23 @@ class Ingestor:
             "writeautomaticsub": False,
             "skip_download": False,
             "noplaylist": True,
+            "max_filesize": MAX_FILESIZE_BYTES,
         }
-
-    def _captions_from_info(self, info: dict[str, Any]) -> list[Caption]:
-        # Best-effort: if yt-dlp has placed JSON3 subs in the info dict.
-        # We accept zero captions silently — they're optional.
-        return []
 
     def ingest(self, url: str) -> IngestResult:
         youtube_id = parse_youtube_id(url)
         opts = self._ydl_opts(youtube_id)
         with YoutubeDL(opts) as ydl:
+            # Probe metadata before downloading so an over-long clip
+            # rejects without touching disk.
+            probe = ydl.extract_info(url, download=False)
+            duration = float(probe.get("duration") or 0)
+            if duration > MAX_DURATION_S:
+                minutes = MAX_DURATION_S // 60
+                raise ValueError(
+                    f"Clip too long ({duration:.0f}s). "
+                    f"Maximum supported is {minutes} minutes."
+                )
             info = ydl.extract_info(url, download=True)
             video_path = Path(ydl.prepare_filename(info))
         return IngestResult(
@@ -61,5 +70,5 @@ class Ingestor:
             title=info.get("title", ""),
             channel=info.get("channel") or info.get("uploader", ""),
             duration_s=float(info.get("duration") or 0),
-            captions=self._captions_from_info(info),
+            captions=[],
         )
