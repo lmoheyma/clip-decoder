@@ -4,6 +4,8 @@
 
 Local-first tool that decodes the visual references in YouTube music videos using NVIDIA NIM endpoints.
 
+![ClipDecoder home — "Every shot is a quotation. We name the source." with the five-stage pipeline strip](docs/screenshots/home.png)
+
 ## Quick start (Docker — recommended)
 
 1. Get a free NVIDIA NIM API key at https://build.nvidia.com (creates an `nvapi-...` key with 1000 inference credits).

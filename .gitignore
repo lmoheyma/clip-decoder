@@ -35,6 +35,7 @@ frontend/tsconfig.tsbuildinfo
 .playwright-mcp/
 *.png
 !frontend/public/*.png
+!docs/screenshots/*.png
 
 # Throwaway HTML/CSS dropped during design exploration
 /index.html
