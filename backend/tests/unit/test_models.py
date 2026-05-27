@@ -66,3 +66,34 @@ def test_verified_reference_verdict_enum():
 def test_pipeline_event_serializable():
     e = PipelineEvent(step="vision", message="frame 5 of 12", progress=0.42)
     assert e.model_dump_json().startswith("{")
+
+
+def test_lyric_link_roundtrips_and_report_defaults_empty():
+    from app.models import LyricLink, Report
+
+    link = LyricLink(
+        lyric_timestamp_s=42.5,
+        lyric="running through the city",
+        frame_id="shot_03",
+        frame_timestamp_s=43.0,
+        relation="literal",
+        note="streaked night streets",
+    )
+    assert link.relation == "literal"
+
+    # Report defaults lyrics_links to [] (back-compat for old rows).
+    report = Report(
+        youtube_id="abc",
+        title="T",
+        channel="C",
+        duration_s=100.0,
+        references=[],
+        frame_analyses=[],
+    )
+    assert report.lyrics_links == []
+
+    # And a Report carrying links round-trips through JSON.
+    report2 = Report.model_validate(
+        {**report.model_dump(), "lyrics_links": [link.model_dump()]}
+    )
+    assert report2.lyrics_links[0].frame_id == "shot_03"
