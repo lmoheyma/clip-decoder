@@ -1,6 +1,7 @@
+import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from app.pipeline.ingestor import Ingestor, parse_youtube_id
+from app.pipeline.ingestor import Ingestor, parse_youtube_id, _parse_json3
 
 
 def test_parse_youtube_id_standard():
@@ -48,9 +49,6 @@ def test_ingest_returns_metadata(tmp_path: Path):
 
 
 def test_parse_json3_coalesces_rolling_lines_and_drops_markers():
-    import json
-    from app.pipeline.ingestor import _parse_json3
-
     # Rolling build-up of one line, then a [Music] marker, then a final line.
     payload = json.dumps({
         "events": [
@@ -72,3 +70,24 @@ def test_parse_json3_coalesces_rolling_lines_and_drops_markers():
     assert texts == ["I'm running through the city", "gold on my mind"]
     assert caps[0].start_s == 1.2
     assert caps[1].start_s == 6.0
+
+
+def test_parse_json3_preserves_far_apart_repeated_prefix_lines():
+    payload = json.dumps({
+        "events": [
+            {"tStartMs": 1000, "dDurationMs": 500, "segs": [{"utf8": "hey"}]},
+            {"tStartMs": 12000, "dDurationMs": 800, "segs": [{"utf8": "hey now"}]},
+        ]
+    })
+    # 11s apart -> NOT a rolling build-up; both lines kept.
+    assert [c.text for c in _parse_json3(payload)] == ["hey", "hey now"]
+
+
+def test_parse_json3_missing_duration_yields_zero_length_caption():
+    payload = json.dumps({
+        "events": [{"tStartMs": 2000, "segs": [{"utf8": "no duration"}]}],
+    })
+    caps = _parse_json3(payload)
+    assert len(caps) == 1
+    assert caps[0].start_s == 2.0
+    assert caps[0].end_s == 2.0

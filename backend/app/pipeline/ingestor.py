@@ -14,7 +14,12 @@ MAX_DURATION_S = 15 * 60  # 15 min
 MAX_FILESIZE_BYTES = 300 * 1024 * 1024  # 300 MB at 480p mp4
 
 
-_BRACKET_MARKER_RE = re.compile(r"^[\[(].*[\])]$")
+# Rolling auto-caption build-ups are emitted as contiguous events a second
+# or two apart; a prefix line that recurs much later is a distinct lyric, so
+# only coalesce prefixes within this window.
+_COALESCE_WINDOW_S = 3.0
+
+_BRACKET_MARKER_RE = re.compile(r"^(\[.*\]|\(.*\))$")
 _WS_RE = re.compile(r"\s+")
 _NON_LYRIC = {"♪", "♪♪"}
 
@@ -43,8 +48,14 @@ def _parse_json3(text: str) -> list[Caption]:
     out: list[Caption] = []
     for i, cap in enumerate(raw):
         nxt = raw[i + 1] if i + 1 < len(raw) else None
-        # Rolling build-up: drop a line that is a prefix of the next one.
-        if nxt is not None and nxt.text.startswith(cap.text):
+        # Rolling build-up: drop a line that is a prefix of the next one,
+        # but only when the next event is close in time (build-ups are
+        # tightly sequential; far-apart matches are distinct lyrics).
+        if (
+            nxt is not None
+            and nxt.text.startswith(cap.text)
+            and nxt.start_s - cap.start_s <= _COALESCE_WINDOW_S
+        ):
             continue
         # Drop consecutive exact duplicates.
         if out and out[-1].text == cap.text:
