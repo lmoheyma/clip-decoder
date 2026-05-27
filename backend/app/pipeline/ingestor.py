@@ -85,9 +85,11 @@ class Ingestor:
         self._work_dir = work_dir
         self._work_dir.mkdir(parents=True, exist_ok=True)
 
-    def _ydl_opts(self, youtube_id: str) -> dict[str, Any]:
+    def _ydl_opts(
+        self, youtube_id: str, subtitle_langs: list[str] | None = None
+    ) -> dict[str, Any]:
         out_template = str(self._work_dir / f"{youtube_id}.%(ext)s")
-        return {
+        opts: dict[str, Any] = {
             "format": "best[height<=480][ext=mp4]/best[height<=480]/best[ext=mp4]/best",
             "outtmpl": out_template,
             "quiet": True,
@@ -98,28 +100,76 @@ class Ingestor:
             "noplaylist": True,
             "max_filesize": MAX_FILESIZE_BYTES,
         }
+        if subtitle_langs:
+            opts.update({
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitlesformat": "json3",
+                "subtitleslangs": subtitle_langs,
+            })
+        return opts
+
+    def _choose_caption_langs(self, info: dict[str, Any]) -> list[str]:
+        available = {
+            **(info.get("automatic_captions") or {}),
+            **(info.get("subtitles") or {}),
+        }
+        if not available:
+            return []
+        lang = info.get("language") or ""
+        for pref in (lang, lang.split("-")[0], "en"):
+            if pref and pref in available:
+                return [pref]
+        return [next(iter(available))]
+
+    def _load_captions(
+        self, info: dict[str, Any], youtube_id: str
+    ) -> list[Caption]:
+        candidates: list[Path] = []
+        for sub in (info.get("requested_subtitles") or {}).values():
+            fp = sub.get("filepath") if isinstance(sub, dict) else None
+            if fp:
+                candidates.append(Path(fp))
+        candidates.extend(self._work_dir.glob(f"{youtube_id}*.json3"))
+
+        for path in candidates:
+            if not path.exists():
+                continue
+            try:
+                caps = _parse_json3(path.read_text(encoding="utf-8"))
+            except Exception:
+                caps = []
+            finally:
+                path.unlink(missing_ok=True)
+            if caps:
+                return caps
+        return []
 
     def ingest(self, url: str) -> IngestResult:
         youtube_id = parse_youtube_id(url)
-        opts = self._ydl_opts(youtube_id)
-        with YoutubeDL(opts) as ydl:
-            # Probe metadata before downloading so an over-long clip
-            # rejects without touching disk.
+        # Probe metadata (cheap, no download) to enforce the duration cap
+        # and discover which caption languages exist before committing.
+        with YoutubeDL(self._ydl_opts(youtube_id)) as ydl:
             probe = ydl.extract_info(url, download=False)
-            duration = float(probe.get("duration") or 0)
-            if duration > MAX_DURATION_S:
-                minutes = MAX_DURATION_S // 60
-                raise ValueError(
-                    f"Clip too long ({duration:.0f}s). "
-                    f"Maximum supported is {minutes} minutes."
-                )
+        duration = float(probe.get("duration") or 0)
+        if duration > MAX_DURATION_S:
+            minutes = MAX_DURATION_S // 60
+            raise ValueError(
+                f"Clip too long ({duration:.0f}s). "
+                f"Maximum supported is {minutes} minutes."
+            )
+
+        langs = self._choose_caption_langs(probe)
+        with YoutubeDL(self._ydl_opts(youtube_id, subtitle_langs=langs)) as ydl:
             info = ydl.extract_info(url, download=True)
             video_path = Path(ydl.prepare_filename(info))
+
+        captions = self._load_captions(info, youtube_id) if langs else []
         return IngestResult(
             youtube_id=youtube_id,
             video_path=video_path,
             title=info.get("title", ""),
             channel=info.get("channel") or info.get("uploader", ""),
             duration_s=float(info.get("duration") or 0),
-            captions=[],
+            captions=captions,
         )
