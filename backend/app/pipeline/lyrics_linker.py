@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Iterable
 from pydantic import ValidationError
 from app.models import Caption, FrameAnalysis, LyricLink
 from app.nim.client import NimClient
@@ -21,7 +21,9 @@ def _format_lyric_lines(captions: list[Caption]) -> str:
     )
 
 
-def _format_frame_summaries(frames: list[FrameAnalysis]) -> str:
+def _format_frame_summaries(frames: Iterable[FrameAnalysis]) -> str:
+    # Abbreviated vs ref_proposer: the linker only needs spatial/setting
+    # context to match a lyric to a frame, not the full vision dump.
     blocks = [
         f"[{f.frame_id} @ {f.timestamp_s:.1f}s] {f.composition}; "
         f"setting={f.costume_setting}; "

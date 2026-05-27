@@ -87,3 +87,21 @@ async def test_nim_failure_returns_empty():
         title="t", captions=[_cap(1.0, "x")], frame_analyses=[_fa("shot_00", 0.0)]
     )
     assert out == []
+
+
+async def test_malformed_link_item_is_dropped():
+    nim = AsyncMock()
+    nim.complete_text.return_value = _payload([
+        {"lyric": "missing required fields"},  # no timestamps/frame_id/etc.
+        {
+            "lyric_timestamp_s": 1.0, "lyric": "ok", "frame_id": "shot_00",
+            "frame_timestamp_s": 1.0, "relation": "literal", "note": "n",
+        },
+    ])
+    linker = LyricsLinker(nim_client=nim, model="m")
+    out = await linker.link(
+        title="t", captions=[_cap(1.0, "ok")], frame_analyses=[_fa("shot_00", 1.0)]
+    )
+    # The malformed item is dropped via ValidationError; the valid one survives.
+    assert len(out) == 1
+    assert out[0].lyric == "ok"
