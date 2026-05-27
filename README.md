@@ -27,7 +27,7 @@ Local-first tool that decodes the visual references in YouTube music videos usin
 
 ## How it works
 
-Six-stage pipeline per clip:
+Seven-stage pipeline per clip:
 
 1. **Ingest** — `yt-dlp` downloads a 480p mp4 and auto-captions if available.
 2. **Shots** — `PySceneDetect` finds shot boundaries; `ffmpeg` extracts one keyframe per shot (capped at 80, evenly distributed).
@@ -35,6 +35,7 @@ Six-stage pipeline per clip:
 4. **Cross-reference** — Llama 3.x (or Nemotron) takes all frame descriptions and proposes named references to specific works.
 5. **Verify** — A second LLM pass adversarially defends each reference; Wikipedia confirms the named work exists. Each reference lands in one of three buckets: `confirmed`, `speculative`, `hidden`.
 6. **Enrich** — For kept references, fetch Wikidata claims (genre, director, performer, location, inception, etc.) dispatched by `work_type`, with French labels preferred and English fallback. Disable with `WIKIDATA_ENRICHMENT=false`.
+7. **Lyrics × Visuals** — When the clip has captions, a final LLM pass pairs notable lyric lines (from YouTube auto-captions) with the on-screen frame at that moment and labels the connection (literal, motif, contrast, amplification). Surfaced in the report behind a "Lyrics × Visuals" tab. Disable with `LYRICS_LINKING=false`. Clips without captions simply omit the tab.
 
 While the pipeline runs, `/report/{id}` streams events over SSE: the keyframe strip fills shot-by-shot, the log tails NIM activity, and candidate cards land as they are proposed. When the run finishes, the same URL flips to the final report: the embedded YouTube player on the left, reference cards on the right (click a card to seek). Each card opens a detail page at `/report/{id}/ref/{n}` with an in-page player cued to the timestamp, the source frame and palette, full frame analysis, and the cross-ref / adversarial / Wikipedia reasoning for that reference.
 
@@ -48,6 +49,8 @@ See `.env.example`. Key knobs:
 - `WIKIDATA_ENRICHMENT` (default true) — set false to skip the Wikidata claim fetch.
 - `WIKIDATA_CONCURRENCY` (default 4) — parallel Wikidata requests during enrichment.
 - `WIKIDATA_TIMEOUT_S` (default 10.0) — per-request timeout for the Wikidata API.
+- `LYRICS_LINKING` (default true) — set false to skip the lyrics↔visuals linking pass (and its extra LLM call).
+- `MAX_LYRIC_LINKS` (default 10) — maximum lyric↔visual pairings surfaced.
 
 Hard limits enforced in code (edit `backend/app/pipeline/ingestor.py` to change):
 
@@ -91,6 +94,7 @@ docker compose -f docker-compose.dev.yml up --build
 Each analysis writes:
 
 - `backend/data/downloads/<youtube_id>.mp4` — deleted once frames are extracted.
+- Auto-caption files are downloaded next to the mp4, parsed, then deleted — no subtitle file is kept.
 - `backend/data/frames/<youtube_id>/*.jpg` — kept forever (served to the report page).
 - `backend/data/clipdecoder.sqlite` — one row per analyzed clip, kept forever.
 
