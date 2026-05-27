@@ -45,3 +45,30 @@ def test_ingest_returns_metadata(tmp_path: Path):
     assert result.duration_s == 240.0
     assert result.video_path == fake_video
     assert result.captions == []
+
+
+def test_parse_json3_coalesces_rolling_lines_and_drops_markers():
+    import json
+    from app.pipeline.ingestor import _parse_json3
+
+    # Rolling build-up of one line, then a [Music] marker, then a final line.
+    payload = json.dumps({
+        "events": [
+            {"tStartMs": 1000, "dDurationMs": 500, "segs": [{"utf8": "I'm"}]},
+            {"tStartMs": 1100, "dDurationMs": 500,
+             "segs": [{"utf8": "I'm "}, {"utf8": "running"}]},
+            {"tStartMs": 1200, "dDurationMs": 800,
+             "segs": [{"utf8": "I'm running "}, {"utf8": "through the city"}]},
+            {"tStartMs": 5000, "dDurationMs": 300, "segs": [{"utf8": "[Music]"}]},
+            {"tStartMs": 6000, "dDurationMs": 900,
+             "segs": [{"utf8": "gold on my mind"}]},
+            {"tStartMs": 7000, "dDurationMs": 100, "segs": [{"utf8": "\n"}]},
+        ]
+    })
+
+    caps = _parse_json3(payload)
+    texts = [c.text for c in caps]
+    # Rolling prefixes collapse to the final, longest form; marker + blank dropped.
+    assert texts == ["I'm running through the city", "gold on my mind"]
+    assert caps[0].start_s == 1.2
+    assert caps[1].start_s == 6.0

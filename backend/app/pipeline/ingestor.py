@@ -1,16 +1,56 @@
 from __future__ import annotations
+import json
 import re
 from pathlib import Path
 from typing import Any
 from yt_dlp import YoutubeDL
 
-from app.models import IngestResult
+from app.models import Caption, IngestResult
 
 # Resource ceiling per analysis. Public-deploy guard: prevents a
 # multi-hour livestream / 4 GB upload from blowing out disk + NIM
 # credits before downstream stages have a chance to bail.
 MAX_DURATION_S = 15 * 60  # 15 min
 MAX_FILESIZE_BYTES = 300 * 1024 * 1024  # 300 MB at 480p mp4
+
+
+_BRACKET_MARKER_RE = re.compile(r"^[\[(].*[\])]$")
+_WS_RE = re.compile(r"\s+")
+_NON_LYRIC = {"♪", "♪♪"}
+
+
+def _parse_json3(text: str) -> list[Caption]:
+    """Parse a YouTube json3 subtitle blob into clean Caption lines.
+
+    Coalesces the rolling auto-caption build-up (a line re-emitted word by
+    word across consecutive events) down to its final form, and drops
+    non-lyric markers like [Music] / [Applause] and blank cues.
+    """
+    data = json.loads(text)
+    raw: list[Caption] = []
+    for ev in data.get("events", []):
+        segs = ev.get("segs")
+        if not segs:
+            continue
+        line = "".join(s.get("utf8", "") for s in segs)
+        line = _WS_RE.sub(" ", line).strip()
+        if not line or line in _NON_LYRIC or _BRACKET_MARKER_RE.match(line):
+            continue
+        start = float(ev.get("tStartMs", 0)) / 1000.0
+        dur = float(ev.get("dDurationMs", 0)) / 1000.0
+        raw.append(Caption(start_s=start, end_s=start + dur, text=line))
+
+    out: list[Caption] = []
+    for i, cap in enumerate(raw):
+        nxt = raw[i + 1] if i + 1 < len(raw) else None
+        # Rolling build-up: drop a line that is a prefix of the next one.
+        if nxt is not None and nxt.text.startswith(cap.text):
+            continue
+        # Drop consecutive exact duplicates.
+        if out and out[-1].text == cap.text:
+            continue
+        out.append(cap)
+    return out
 
 
 _YT_ID_RE = re.compile(
