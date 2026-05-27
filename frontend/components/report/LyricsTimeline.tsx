@@ -13,7 +13,7 @@ const RELATION_VARIANT: Record<string, string> = {
     "bg-[color:color-mix(in_oklab,var(--grad-peach)_18%,var(--surface-strong))] border-[color:color-mix(in_oklab,var(--grad-peach)_30%,transparent)] text-grad-peach",
   motif:
     "bg-[color:color-mix(in_oklab,var(--grad-sky)_16%,var(--surface-strong))] border-[color:color-mix(in_oklab,var(--grad-sky)_30%,transparent)] text-grad-sky",
-  contrast: "bg-surface-strong border-l-error border-hairline text-error",
+  contrast: "bg-surface-strong border-hairline border-l-error text-error",
   amplification: "bg-surface-strong border-hairline text-body",
   other: "bg-surface-strong border-hairline text-muted",
 };
