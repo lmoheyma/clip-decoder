@@ -81,4 +81,18 @@ describe("ReportContent tabs", () => {
     fireEvent.click(screen.getByRole("tab", { name: /lyrics/i }));
     expect(screen.getByText(/gold on my mind/)).toBeInTheDocument();
   });
+
+  it("scopes the FilterBar to the References tab", () => {
+    const report = { ...fakeReport, lyrics_links: [lyricLink] };
+    render(<ReportContent report={report} youtubeId="abc" />);
+    // FilterBar (its verdict chips) is present on the default References tab.
+    expect(
+      screen.getByRole("button", { name: /confirmed/i }),
+    ).toBeInTheDocument();
+    // Switching to the Lyrics tab unmounts the FilterBar.
+    fireEvent.click(screen.getByRole("tab", { name: /lyrics/i }));
+    expect(
+      screen.queryByRole("button", { name: /confirmed/i }),
+    ).not.toBeInTheDocument();
+  });
 });
