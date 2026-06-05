@@ -70,6 +70,8 @@ export function buildLogLines(events: PipelineEvent[]): LogLine[] {
       lines.push({ t, lvl: "crossref", text: e.message });
     } else if (e.step === "verify") {
       lines.push({ t, lvl: "verify", text: e.message });
+    } else if (e.step === "lyrics") {
+      lines.push({ t, lvl: "lyrics", text: e.message });
     } else if (e.step === "vision" && e.message) {
       lines.push({ t, lvl: "vision", text: e.message });
     } else if (e.step === "nim_retry") {

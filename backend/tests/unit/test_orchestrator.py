@@ -481,8 +481,11 @@ async def test_orchestrator_stores_lyrics_links(tmp_path: Path):
         lyrics_linker=lyrics_linker,
     )
 
+    received: list = []
+
     async def collect():
         async for ev in bus.subscribe("abc"):
+            received.append(ev)
             if ev.step == "done":
                 return
     consumer = asyncio.create_task(collect())
@@ -492,3 +495,9 @@ async def test_orchestrator_stores_lyrics_links(tmp_path: Path):
     lyrics_linker.link.assert_awaited_once()
     saved_report = db_mock.save_report.call_args.args[0]
     assert saved_report.lyrics_links[0].relation == "motif"
+    # The linking stage emits its own dedicated "lyrics" pipeline events
+    # (a start and a completion message) so the live UI shows a distinct
+    # stage rather than folding the work into the Verify band.
+    lyrics_events = [e for e in received if e.step == "lyrics"]
+    assert lyrics_events, "expected at least one step='lyrics' event"
+    assert all(0.90 <= e.progress <= 1.0 for e in lyrics_events)

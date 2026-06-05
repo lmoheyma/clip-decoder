@@ -184,9 +184,11 @@ class Verifier:
             async with lock:
                 completed += 1
                 if on_progress:
-                    # Progress band for verify is 0.75 -> 1.0 (25%); each
-                    # candidate moves us linearly across it.
-                    p = 0.75 + (completed / max(total, 1)) * 0.25
+                    # Progress band for verify is 0.75 -> 0.88; each candidate
+                    # moves us linearly across it. The tail (0.88 -> 1.0) is
+                    # reserved for Wikidata enrichment and the lyrics-linking
+                    # stage, which own their own pipeline bands.
+                    p = 0.75 + (completed / max(total, 1)) * 0.13
                     bucket = res.final_confidence.value
                     await on_progress(
                         f"Verified {completed}/{total} · "

@@ -209,7 +209,7 @@ class Orchestrator:
                 await self._emit(
                     yid, "verify",
                     f"Enriching {len(verified)} with Wikidata",
-                    0.95,
+                    0.89,
                 )
                 try:
                     enriched = await self._enricher.enrich(
@@ -221,18 +221,36 @@ class Orchestrator:
             else:
                 enriched = verified
 
+            # Lyrics × Visuals linking owns the final pipeline band (0.90 ->
+            # 1.0) and emits its own step="lyrics" events so the live UI shows
+            # a dedicated stage instead of folding into Verify. Skipped
+            # silently (no lyrics events) when the clip has no captions.
             lyrics_links = []
             if self._lyrics_linker is not None and ingest.captions:
+                await self._emit(
+                    yid, "lyrics",
+                    f"Linking {len(ingest.captions)} lyric lines to visuals…",
+                    0.92,
+                )
+
+                async def _on_lyrics_progress(msg: str, progress: float) -> None:
+                    await self._emit(yid, "lyrics", msg, progress)
+
                 try:
                     lyrics_links = await self._lyrics_linker.link(
                         title=ingest.title,
                         captions=ingest.captions,
                         frame_analyses=frame_analyses,
-                        on_progress=_on_verify_progress,
+                        on_progress=_on_lyrics_progress,
                     )
                 except Exception:
                     logger.exception("lyrics linking raised — continuing")
                     lyrics_links = []
+                await self._emit(
+                    yid, "lyrics",
+                    f"Linked {len(lyrics_links)} lyric moments",
+                    0.99,
+                )
 
             # Stable visual order: report.references[n] must match the n-th
             # card on the report grid (which sorts by timestamp_s at render).

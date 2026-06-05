@@ -60,6 +60,7 @@ export function subscribePipeline(
     "crossref_candidate",
     "verify",
     "verify_candidate",
+    "lyrics",
     "nim_retry",
     "done",
     "error",

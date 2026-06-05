@@ -13,7 +13,7 @@ function ev(
 describe("classifySteps", () => {
   it("returns all pending when no events", () => {
     const steps = classifySteps([]);
-    expect(steps).toHaveLength(5);
+    expect(steps).toHaveLength(6);
     for (const s of steps) {
       expect(s.status).toBe("pending");
       expect(s.progress).toBe(0);
@@ -38,13 +38,30 @@ describe("classifySteps", () => {
     expect(crossref.status).toBe("pending");
   });
 
+  it("marks verify done and lyrics active when a lyrics event arrives", () => {
+    const steps = classifySteps([
+      ev("ingest", 0.1),
+      ev("shots", 0.2),
+      ev("vision", 0.55),
+      ev("crossref", 0.7),
+      ev("verify", 0.88),
+      ev("lyrics", 0.92),
+    ]);
+    const verify = steps.find((s) => s.key === "verify")!;
+    const lyrics = steps.find((s) => s.key === "lyrics")!;
+    expect(verify.status).toBe("done");
+    expect(lyrics.status).toBe("active");
+    expect(lyrics.progress).toBeCloseTo(0.2, 5);
+  });
+
   it("marks all done when done event seen", () => {
     const steps = classifySteps([
       ev("ingest", 0.1),
       ev("shots", 0.2),
       ev("vision", 0.55),
       ev("crossref", 0.7),
-      ev("verify", 0.9),
+      ev("verify", 0.88),
+      ev("lyrics", 0.99),
       ev("done", 1.0),
     ]);
     for (const s of steps) {

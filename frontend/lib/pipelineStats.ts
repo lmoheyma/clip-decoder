@@ -3,7 +3,7 @@ import type { PipelineEvent } from "./types";
 export type StepStatus = "pending" | "active" | "done" | "error";
 
 export interface StepInfo {
-  key: "ingest" | "shots" | "vision" | "crossref" | "verify";
+  key: "ingest" | "shots" | "vision" | "crossref" | "verify" | "lyrics";
   label: string;
   status: StepStatus;
   progress: number;
@@ -22,7 +22,8 @@ const BANDS: Band[] = [
   { key: "shots",    label: "Shots",     floor: 0.10, ceiling: 0.20 },
   { key: "vision",   label: "Vision",    floor: 0.20, ceiling: 0.55 },
   { key: "crossref", label: "Cross-ref", floor: 0.55, ceiling: 0.70 },
-  { key: "verify",   label: "Verify",    floor: 0.70, ceiling: 1.00 },
+  { key: "verify",   label: "Verify",    floor: 0.70, ceiling: 0.90 },
+  { key: "lyrics",   label: "Lyrics",    floor: 0.90, ceiling: 1.00 },
 ];
 
 export function classifySteps(events: PipelineEvent[]): StepInfo[] {
