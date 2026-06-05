@@ -418,3 +418,77 @@ async def test_orchestrator_continues_when_enricher_raises(tmp_path: Path):
     saved_report = db_mock.save_report.call_args.args[0]
     # graceful degrade: references saved with unrelated fields intact
     assert saved_report.references[0].medium is None
+
+
+async def test_orchestrator_stores_lyrics_links(tmp_path: Path):
+    from app.models import Caption, LyricLink
+
+    keyframes, fa_results, candidates = _default_fixtures(tmp_path)
+
+    verifier = AsyncMock()
+    verifier.verify_all.return_value = [
+        VerifiedReference(
+            **candidates[0].model_dump(),
+            verdict=Verdict.KEEP,
+            final_confidence=Confidence.CONFIRMED,
+            supporting_elements=["a"],
+            wikipedia_url=None,
+            cross_ref_reasoning="cr",
+            adversarial_reasoning="ad",
+            wikipedia_reasoning="wk",
+        )
+    ]
+
+    lyrics_linker = AsyncMock()
+    lyrics_linker.link.return_value = [
+        LyricLink(
+            lyric_timestamp_s=1.0, lyric="gold on my mind",
+            frame_id="shot_00", frame_timestamp_s=1.0,
+            relation="motif", note="palette warms to gold",
+        )
+    ]
+
+    db_mock = AsyncMock()
+    db_mock.get_status = AsyncMock(return_value=AnalysisStatus.DONE)
+    db_mock.save_report = AsyncMock()
+    db_mock.set_status = AsyncMock()
+    bus = EventBus()
+
+    ingestor = MagicMock()
+    ingestor.ingest.return_value = IngestResult(
+        youtube_id="abc", video_path=tmp_path / "v.mp4",
+        title="t", channel="c", duration_s=10.0,
+        captions=[Caption(start_s=1.0, end_s=2.0, text="gold on my mind")],
+    )
+    sampler = MagicMock()
+    sampler.sample.return_value = keyframes
+
+    async def _analyze(kfs, on_frame=None):
+        return fa_results
+    frame_analyzer = MagicMock()
+    frame_analyzer.analyze = _analyze
+
+    async def _propose(**kw):
+        return candidates
+    proposer = MagicMock()
+    proposer.propose = _propose
+
+    orch = Orchestrator(
+        db=db_mock, bus=bus,
+        ingestor=ingestor, sampler=sampler,
+        frame_analyzer=frame_analyzer,
+        ref_proposer=proposer, verifier=verifier,
+        lyrics_linker=lyrics_linker,
+    )
+
+    async def collect():
+        async for ev in bus.subscribe("abc"):
+            if ev.step == "done":
+                return
+    consumer = asyncio.create_task(collect())
+    await orch.run("https://www.youtube.com/watch?v=abc")
+    await asyncio.wait_for(consumer, timeout=2.0)
+
+    lyrics_linker.link.assert_awaited_once()
+    saved_report = db_mock.save_report.call_args.args[0]
+    assert saved_report.lyrics_links[0].relation == "motif"

@@ -15,6 +15,7 @@ from app.pipeline.orchestrator import Orchestrator
 from app.pipeline.ref_proposer import RefProposer
 from app.pipeline.shot_sampler import ShotSampler
 from app.pipeline.verifier import Verifier
+from app.pipeline.lyrics_linker import LyricsLinker
 from app.pipeline.wikidata_enricher import WikidataEnricher
 from app.settings import settings
 
@@ -88,6 +89,15 @@ def _build_default_app() -> FastAPI:
             concurrency=settings.nim_concurrency,
         ),
         enricher=enricher,
+        lyrics_linker=(
+            LyricsLinker(
+                nim_client=nim,
+                model=settings.llm_model,
+                max_links=settings.max_lyric_links,
+            )
+            if settings.lyrics_linking
+            else None
+        ),
     )
     return build_app(db=db, bus=bus, run_pipeline=orch.run)
 

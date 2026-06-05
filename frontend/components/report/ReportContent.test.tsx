@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 // Mock VideoPlayer so the test does not load a YouTube iframe.
@@ -16,7 +16,7 @@ vi.mock("@/components/VideoPlayer", () => {
   };
 });
 import { ReportContent } from "./ReportContent";
-import type { Report } from "@/lib/types";
+import type { Report, LyricLink } from "@/lib/types";
 
 const fakeReport: Report = {
   youtube_id: "abc",
@@ -55,5 +55,44 @@ describe("ReportContent hash-seek", () => {
     render(<ReportContent report={fakeReport} youtubeId="abc" />);
     await new Promise((r) => setTimeout(r, 10));
     expect((globalThis as any).__lastSeekTo).not.toHaveBeenCalled();
+  });
+});
+
+const lyricLink: LyricLink = {
+  lyric_timestamp_s: 42,
+  lyric: "gold on my mind",
+  frame_id: "shot_00",
+  frame_timestamp_s: 42,
+  relation: "motif",
+  note: "palette warms to gold",
+};
+
+describe("ReportContent tabs", () => {
+  it("shows no tab switch when there are no lyrics links", () => {
+    render(<ReportContent report={fakeReport} youtubeId="abc" />);
+    expect(screen.queryByRole("tab", { name: /lyrics/i })).not.toBeInTheDocument();
+  });
+
+  it("shows tabs and switches to the lyrics timeline when links exist", () => {
+    const report = { ...fakeReport, lyrics_links: [lyricLink] };
+    render(<ReportContent report={report} youtubeId="abc" />);
+    // References tab is the default; lyric text not visible yet.
+    expect(screen.queryByText(/gold on my mind/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /lyrics/i }));
+    expect(screen.getByText(/gold on my mind/)).toBeInTheDocument();
+  });
+
+  it("scopes the FilterBar to the References tab", () => {
+    const report = { ...fakeReport, lyrics_links: [lyricLink] };
+    render(<ReportContent report={report} youtubeId="abc" />);
+    // FilterBar (its verdict chips) is present on the default References tab.
+    expect(
+      screen.getByRole("button", { name: /confirmed/i }),
+    ).toBeInTheDocument();
+    // Switching to the Lyrics tab unmounts the FilterBar.
+    fireEvent.click(screen.getByRole("tab", { name: /lyrics/i }));
+    expect(
+      screen.queryByRole("button", { name: /confirmed/i }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     wikidata_enrichment: bool = True
     wikidata_concurrency: int = 4
     wikidata_timeout_s: float = 10.0
+    # Lyrics × Visuals linking: a dedicated LLM pass that pairs notable
+    # lyric lines (from auto-captions) to on-screen frames. Independent of
+    # the reference pipeline; disable to skip the extra NIM call entirely.
+    lyrics_linking: bool = True
+    max_lyric_links: int = 10
 
     data_dir: Path = Path("data")
     db_path: Path = Path("data/clipdecoder.sqlite")

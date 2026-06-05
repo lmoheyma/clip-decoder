@@ -12,6 +12,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { SummaryCard } from "@/components/SummaryCard";
 import { ReferenceCard } from "@/components/ReferenceCard";
 import { BrandLink } from "@/components/BrandLink";
+import { LyricsTimeline } from "@/components/report/LyricsTimeline";
 
 function formatDuration(s: number): string {
   const t = Math.floor(s);
@@ -49,6 +50,10 @@ export function ReportContent({
     new Set<Confidence>(["confirmed", "speculative"]),
   );
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+
+  const lyricsLinks = report.lyrics_links ?? [];
+  const hasLyrics = lyricsLinks.length > 0;
+  const [activeTab, setActiveTab] = useState<"references" | "lyrics">("references");
 
   useEffect(() => {
     if (selectedTypes.size === 0 && stats.availableTypes.length > 0) {
@@ -108,12 +113,15 @@ export function ReportContent({
     });
   }
 
-  function jumpTo(ref: VerifiedReference) {
-    playerRef.current?.seekTo(ref.timestamp_s);
+  function jumpToTime(t: number) {
+    playerRef.current?.seekTo(t);
     playerContainerRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
+  }
+  function jumpTo(ref: VerifiedReference) {
+    jumpToTime(ref.timestamp_s);
   }
   async function shareLink() {
     try {
@@ -185,49 +193,90 @@ export function ReportContent({
         <SummaryCard stats={stats} />
       </section>
 
-      <FilterBar
-        verdictCounts={{
-          confirmed: stats.confirmed,
-          speculative: stats.speculative,
-          hidden: stats.hidden,
-        }}
-        typeCounts={Object.fromEntries(
-          stats.typeBreakdown.map((t) => [t.type, t.count]),
-        )}
-        availableTypes={stats.availableTypes}
-        selectedVerdicts={selectedVerdicts}
-        selectedTypes={selectedTypes}
-        onToggleVerdict={toggleVerdict}
-        onToggleType={toggleType}
-      />
-
-      <div className="ref-grid relative z-[1] grid gap-[18px] py-8 px-[clamp(32px,5vw,64px)] grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))]">
-        {filteredRefs.length === 0 ? (
-          <div
-            className="font-sans text-[12px] font-semibold uppercase tracking-uc text-muted col-span-full text-center p-12"
-          >
-            All references filtered out. Re-enable a chip above.
-          </div>
-        ) : (
-          filteredRefs.map((ref) => {
-            const frame = frameById.get(ref.source_frame_id);
-            const paletteHex = frame?.palette_hex ?? [];
-            const paletteDescriptors = frame?.palette ?? [];
-            const idx = report.references.indexOf(ref);
+      {hasLyrics && (
+        <div
+          role="tablist"
+          aria-label="Report sections"
+          className="relative z-[1] flex gap-2 px-[clamp(32px,5vw,64px)] pt-4"
+        >
+          {([
+            ["references", "References"],
+            ["lyrics", `Lyrics × Visuals · ${lyricsLinks.length}`],
+          ] as const).map(([key, label]) => {
+            const on = activeTab === key;
             return (
-              <ReferenceCard
-                key={`${ref.source_frame_id}-${idx}`}
-                reference={ref}
-                index={idx}
-                paletteHex={paletteHex}
-                paletteDescriptors={paletteDescriptors}
-                youtubeId={report.youtube_id}
-                onJump={() => jumpTo(ref)}
-              />
+              <button
+                key={key}
+                role="tab"
+                type="button"
+                aria-selected={on}
+                onClick={() => setActiveTab(key)}
+                className={`inline-flex items-center gap-2 px-4 py-[7px] rounded-full border font-sans text-[12px] font-semibold uppercase tracking-uc cursor-pointer transition-[opacity,color,background] duration-200 ${
+                  on
+                    ? "bg-surface-strong border-hairline-strong text-ink"
+                    : "bg-transparent border-hairline text-muted opacity-60 hover:opacity-100"
+                }`}
+              >
+                {label}
+              </button>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
+
+      {(!hasLyrics || activeTab === "references") && (
+        <>
+          <FilterBar
+            verdictCounts={{
+              confirmed: stats.confirmed,
+              speculative: stats.speculative,
+              hidden: stats.hidden,
+            }}
+            typeCounts={Object.fromEntries(
+              stats.typeBreakdown.map((t) => [t.type, t.count]),
+            )}
+            availableTypes={stats.availableTypes}
+            selectedVerdicts={selectedVerdicts}
+            selectedTypes={selectedTypes}
+            onToggleVerdict={toggleVerdict}
+            onToggleType={toggleType}
+          />
+
+          <div className="ref-grid relative z-[1] grid gap-[18px] py-8 px-[clamp(32px,5vw,64px)] grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))]">
+            {filteredRefs.length === 0 ? (
+              <div className="font-sans text-[12px] font-semibold uppercase tracking-uc text-muted col-span-full text-center p-12">
+                All references filtered out. Re-enable a chip above.
+              </div>
+            ) : (
+              filteredRefs.map((ref) => {
+                const frame = frameById.get(ref.source_frame_id);
+                const paletteHex = frame?.palette_hex ?? [];
+                const paletteDescriptors = frame?.palette ?? [];
+                const idx = report.references.indexOf(ref);
+                return (
+                  <ReferenceCard
+                    key={`${ref.source_frame_id}-${idx}`}
+                    reference={ref}
+                    index={idx}
+                    paletteHex={paletteHex}
+                    paletteDescriptors={paletteDescriptors}
+                    youtubeId={report.youtube_id}
+                    onJump={() => jumpTo(ref)}
+                  />
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
+
+      {hasLyrics && activeTab === "lyrics" && (
+        <LyricsTimeline
+          links={lyricsLinks}
+          youtubeId={report.youtube_id}
+          onSeek={jumpToTime}
+        />
+      )}
 
     </main>
   );

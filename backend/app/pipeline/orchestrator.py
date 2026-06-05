@@ -11,6 +11,7 @@ from app.pipeline.ingestor import Ingestor
 from app.pipeline.ref_proposer import RefProposer
 from app.pipeline.shot_sampler import ShotSampler
 from app.pipeline.verifier import Verifier
+from app.pipeline.lyrics_linker import LyricsLinker
 from app.pipeline.wikidata_enricher import WikidataEnricher
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class Orchestrator:
         ref_proposer: RefProposer,
         verifier: Verifier,
         enricher: WikidataEnricher | None = None,
+        lyrics_linker: LyricsLinker | None = None,
     ):
         self._db = db
         self._bus = bus
@@ -37,6 +39,7 @@ class Orchestrator:
         self._ref_proposer = ref_proposer
         self._verifier = verifier
         self._enricher = enricher
+        self._lyrics_linker = lyrics_linker
 
     async def _emit(
         self, youtube_id: str, step: str, message: str, progress: float = 0.0,
@@ -218,6 +221,19 @@ class Orchestrator:
             else:
                 enriched = verified
 
+            lyrics_links = []
+            if self._lyrics_linker is not None and ingest.captions:
+                try:
+                    lyrics_links = await self._lyrics_linker.link(
+                        title=ingest.title,
+                        captions=ingest.captions,
+                        frame_analyses=frame_analyses,
+                        on_progress=_on_verify_progress,
+                    )
+                except Exception:
+                    logger.exception("lyrics linking raised — continuing")
+                    lyrics_links = []
+
             # Stable visual order: report.references[n] must match the n-th
             # card on the report grid (which sorts by timestamp_s at render).
             enriched.sort(key=lambda r: r.timestamp_s)
@@ -231,6 +247,7 @@ class Orchestrator:
                 duration_s=ingest.duration_s,
                 references=kept,
                 frame_analyses=frame_analyses,
+                lyrics_links=lyrics_links,
             )
             await self._db.save_report(report, status=AnalysisStatus.DONE)
 

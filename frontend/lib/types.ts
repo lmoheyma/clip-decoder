@@ -36,6 +36,15 @@ export interface FrameAnalysis {
   confidence_in_observation: number;
 }
 
+export interface LyricLink {
+  lyric_timestamp_s: number;
+  lyric: string;
+  frame_id: string;
+  frame_timestamp_s: number;
+  relation: string; // literal | motif | contrast | amplification | other
+  note: string;
+}
+
 export interface Report {
   youtube_id: string;
   title: string;
@@ -43,6 +52,7 @@ export interface Report {
   duration_s: number;
   references: VerifiedReference[];
   frame_analyses: FrameAnalysis[];
+  lyrics_links?: LyricLink[];
   created_at?: string;
 }
 

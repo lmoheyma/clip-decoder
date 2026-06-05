@@ -55,6 +55,15 @@ class FrameAnalysis(BaseModel):
     confidence_in_observation: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
+class LyricLink(BaseModel):
+    lyric_timestamp_s: Annotated[float, Field(ge=0.0)]
+    lyric: str
+    frame_id: str
+    frame_timestamp_s: Annotated[float, Field(ge=0.0)]
+    relation: str  # literal | motif | contrast | amplification | other
+    note: str
+
+
 class ReferenceCandidate(BaseModel):
     timestamp_s: Annotated[float, Field(ge=0.0)]
     source_frame_id: str
@@ -90,6 +99,7 @@ class Report(BaseModel):
     duration_s: Annotated[float, Field(ge=0.0)]
     references: list[VerifiedReference]
     frame_analyses: list[FrameAnalysis]
+    lyrics_links: list[LyricLink] = []
 
 
 class PipelineEvent(BaseModel):

@@ -1,6 +1,7 @@
+import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from app.pipeline.ingestor import Ingestor, parse_youtube_id
+from app.pipeline.ingestor import Ingestor, parse_youtube_id, _parse_json3
 
 
 def test_parse_youtube_id_standard():
@@ -45,3 +46,86 @@ def test_ingest_returns_metadata(tmp_path: Path):
     assert result.duration_s == 240.0
     assert result.video_path == fake_video
     assert result.captions == []
+
+
+def test_parse_json3_coalesces_rolling_lines_and_drops_markers():
+    # Rolling build-up of one line, then a [Music] marker, then a final line.
+    payload = json.dumps({
+        "events": [
+            {"tStartMs": 1000, "dDurationMs": 500, "segs": [{"utf8": "I'm"}]},
+            {"tStartMs": 1100, "dDurationMs": 500,
+             "segs": [{"utf8": "I'm "}, {"utf8": "running"}]},
+            {"tStartMs": 1200, "dDurationMs": 800,
+             "segs": [{"utf8": "I'm running "}, {"utf8": "through the city"}]},
+            {"tStartMs": 5000, "dDurationMs": 300, "segs": [{"utf8": "[Music]"}]},
+            {"tStartMs": 6000, "dDurationMs": 900,
+             "segs": [{"utf8": "gold on my mind"}]},
+            {"tStartMs": 7000, "dDurationMs": 100, "segs": [{"utf8": "\n"}]},
+        ]
+    })
+
+    caps = _parse_json3(payload)
+    texts = [c.text for c in caps]
+    # Rolling prefixes collapse to the final, longest form; marker + blank dropped.
+    assert texts == ["I'm running through the city", "gold on my mind"]
+    assert caps[0].start_s == 1.2
+    assert caps[1].start_s == 6.0
+
+
+def test_parse_json3_preserves_far_apart_repeated_prefix_lines():
+    payload = json.dumps({
+        "events": [
+            {"tStartMs": 1000, "dDurationMs": 500, "segs": [{"utf8": "hey"}]},
+            {"tStartMs": 12000, "dDurationMs": 800, "segs": [{"utf8": "hey now"}]},
+        ]
+    })
+    # 11s apart -> NOT a rolling build-up; both lines kept.
+    assert [c.text for c in _parse_json3(payload)] == ["hey", "hey now"]
+
+
+def test_parse_json3_missing_duration_yields_zero_length_caption():
+    payload = json.dumps({
+        "events": [{"tStartMs": 2000, "segs": [{"utf8": "no duration"}]}],
+    })
+    caps = _parse_json3(payload)
+    assert len(caps) == 1
+    assert caps[0].start_s == 2.0
+    assert caps[0].end_s == 2.0
+
+
+def test_ingest_loads_captions_from_requested_subtitles(tmp_path: Path):
+    import json
+    fake_video = tmp_path / "vid.mp4"
+    fake_video.write_bytes(b"fake")
+    sub_file = tmp_path / "vid.en.json3"
+    sub_file.write_text(json.dumps({
+        "events": [
+            {"tStartMs": 1000, "dDurationMs": 900,
+             "segs": [{"utf8": "gold on my mind"}]},
+        ]
+    }), encoding="utf-8")
+
+    info = {
+        "id": "dQw4w9WgXcQ",
+        "title": "Test Title",
+        "channel": "Test Channel",
+        "duration": 240,
+        "language": "en",
+        "subtitles": {},
+        "automatic_captions": {"en": [{"ext": "json3"}]},
+        "requested_subtitles": {"en": {"filepath": str(sub_file)}},
+    }
+
+    fake_ydl = MagicMock()
+    fake_ydl.__enter__.return_value = fake_ydl
+    fake_ydl.__exit__.return_value = False
+    fake_ydl.extract_info.return_value = info
+    fake_ydl.prepare_filename.return_value = str(fake_video)
+
+    with patch("app.pipeline.ingestor.YoutubeDL", return_value=fake_ydl):
+        ing = Ingestor(work_dir=tmp_path)
+        result = ing.ingest("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+    assert [c.text for c in result.captions] == ["gold on my mind"]
+    # Subtitle file is cleaned up after parsing.
+    assert not sub_file.exists()
